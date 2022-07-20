@@ -1,5 +1,5 @@
 /**********************************************************************************************************************************/
-#include "SIM.h"
+#include "ASIM.h"
 
 char replybuffer[255];
 /**********************************************************************************************************************************/
@@ -87,40 +87,45 @@ bool ASIM::begin(Stream &port) {
 	delay(100);
 
 	// Get modem type
-	_modem_type = getModemType();
+	// _modem_type = getModemType();
 
-	// Get modem IMEI
-	getIMEI();
+	// // Get modem IMEI
+	// getIMEI();
 
 	// Get SIM card type
 	_sim_type = getSimType();
 
-	// Check modem status
-	checkModemStatus();
+	// // Check modem status
+	// checkModemStatus();
 
-	// Set baudrate
-	setBaud(9600);
+	// // Set baudrate
+	// setBaud(9600);
 
-	// Set message mode
-	#ifdef DEFUALT_MODE
-		setMessageFormat(DEFUALT_MODE);
+	// // Set message mode
+	// #ifdef DEFUALT_MODE
+	// 	setMessageFormat(DEFUALT_MODE);
+	// #endif
+
+	// // Set char set
+	// #ifdef	DEFUALT_CHARSET
+	// 	setCharSet(DEFUALT_CHARSET);
+	// #endif
+
+	// // Set CLI
+	// setCLI();
+
+	// // Set SMS parameters
+	// # ifdef SET_SMS_PARAM
+	// 	setSMSParameters(49, 167, 0, 0);
+	// #endif
+
+	// // Delete all sms
+	// clearInbox();
+
+	// Set simcard language to English
+	# ifdef SET_LANG_TO_ENG
+		setSIMLanguage(ENGLISH);
 	#endif
-
-	// Set char set
-	#ifdef	DEFUALT_CHARSET
-		setCharSet(DEFUALT_CHARSET);
-	#endif
-
-	// Set CLI
-	setCLI();
-
-	// Set SMS parameters
-	# ifdef SET_SMS_PARAM
-		setSMSParameters(49, 167, 0, 0);
-	#endif
-
-	// Delete all sms
-	clearInbox();
 
 	// Flush serial port
 	flushInput();
@@ -735,7 +740,7 @@ uint8_t ASIM::getSimType() {
 
 	if(prog_char_strstr(replybuffer, (prog_char *)F("\"43235\""))) {
 		DEBUG_PRINTLN(F("SIM type is MTN IRANCELL"));
-		return MTN;
+		return IRANCELL;
 	}
 	else if(prog_char_strstr(replybuffer, (prog_char *)F("\"TCI\""))) {
 		DEBUG_PRINTLN(F("SIM type is HAMRAH-E AVVAL"));
@@ -918,6 +923,40 @@ bool ASIM::setSMSParameters(uint8_t fo, uint16_t vp, uint8_t pid, uint8_t dcs) {
 	DEBUG_PRINTLN(F("================= SET CLIP ================="));
 	sprintf(_cmd, "AT+CSMP=%d,%d,%d,%d", fo, vp, pid, dcs);
 	return sendVerifyedCommand(_cmd, ok_reply, 500);
+}
+
+/**
+ * @brief Set simcard language
+ *
+ * @param lang language (FARSI=27 and ENGLISH=37)
+ * @return bool true if set successfully, false otherwise
+*/
+bool ASIM::setSIMLanguage(uint8_t lang) {
+	char result[512];
+	uint16_t result_len = 0;
+
+	DEBUG_PRINTLN(F("================= SET SIM LANGUAGE ================="));
+	if(_sim_type == MCI) {
+		DEBUG_PRINTLN("MCI DOES NOT SUPPORT CHANGE LANGUAGE");
+		return SIM_FAILED;
+	}
+
+	if((_sim_type != IRANCELL) && (lang == FARSI)) {
+		DEBUG_PRINTLN("YOUR SIMCARD DOES NOT SUPPORT FARSI LANGUAGE");
+		return SIM_FAILED;
+	}
+
+	if(lang == ENGLISH) {
+		if(_sim_type == IRANCELL) {
+			return(sendUSSD("*555*4*3*2#", result, &result_len, 512));
+		}
+	}
+
+	if(lang == FARSI) {
+		if(_sim_type == IRANCELL) {
+			return(sendUSSD("*555*4*3*1#", result, &result_len, 512));
+		}	
+	}
 }
 /**********************************************************************************************************************************/
 /**

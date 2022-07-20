@@ -83,10 +83,10 @@ bool ASIM::begin(Stream &port) {
 	DEBUG_PRINTLN(F("Initializing....(May take 10 seconds)"));
 
 	// Turn of echo
-	sendVerifyedCommand(F("ATE0"), ok_reply);
-	delay(100);
+	// sendVerifyedCommand(F("ATE0"), ok_reply);
+	// delay(100);
 
-	// Get modem type
+	// // Get modem type
 	// _modem_type = getModemType();
 
 	// // Get modem IMEI
@@ -122,7 +122,7 @@ bool ASIM::begin(Stream &port) {
 	// // Delete all sms
 	// clearInbox();
 
-	// Set simcard language to English
+	// // Set simcard language to English
 	// # ifdef SET_LANG_TO_ENG
 	// 	setSIMLanguage(ENGLISH);
 	// #endif
@@ -234,7 +234,7 @@ uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
 			char c = simSerial->read();
 
 			if ((c == '\r') || (c == '\n')) continue;
-			if ((c == 'A') || (c == 'T')) continue;
+			//if ((c == 'A') || (c == 'T')) continue;
 			if (c == 0xA) {
 				if (replyidx == 0) continue; // the first 0x0A is ignored
 	
@@ -1288,7 +1288,7 @@ int8_t ASIM::getNumSMS() {
  * @param response_len The length actually read
  * @param max_len The maximum read length 
  * @return bool true if success, false otherwise
- */
+*/
 bool ASIM::sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len, uint16_t max_len) {
 	char _cmd[35] = "AT+CUSD=1,\"";
 
@@ -1335,20 +1335,74 @@ bool ASIM::sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len
 }
 /**********************************************************************************************************************************/
 /**
+ * @brief Get current status of TCP connection
+ *
+ * @return TCP status
+*/
+uint8_t ASIM::getTCPStatus() {
+	char con_status[256];
+	char *substr;
+
+	DEBUG_PRINTLN(F("================= READ TCP STATUS ================="));
+	DEBUG_PRINTLN("\t---> AT+CIPSTATUS");
+	simSerial->println(F("AT+CIPSTATUS"));
+	readAnswer(1000);
+
+	DEBUG_PRINT("\t");
+	DEBUG_PRINT(replybuffer);
+	DEBUG_PRINTLN(" <---");
+	substr = replybuffer + 9;
+	strcpy(con_status, substr);
+
+	if(strcmp(con_status, "IP INITIAL") == 0) {
+		return IP_INITIAL;
+	}
+	if(strcmp(con_status, "IP START") == 0) {
+		return IP_START;
+	}
+	if(strcmp(con_status, "IP CONFIG") == 0) {
+		return IP_CONFIG;
+	}
+	if(strcmp(con_status, "IP GPRSACT") == 0) {
+		return IP_GPRSACT;
+	}
+	if(strcmp(con_status, "IP STATUS") == 0) {
+		return IP_STATUS;
+	}
+	if(strcmp(con_status, "TCP CONNECTING") == 0) {
+		return TCP_CONNECTING;
+	}
+	if(strcmp(con_status, "CONNECT OK") == 0) {
+		return TCP_CONNECTED;
+	}
+	if(strcmp(con_status, "TCP CLOSING") == 0) {
+		return TCP_CLOSING;
+	}
+	if(strcmp(con_status, "TCP CLOSED") == 0) {
+		return TCP_CLOSED;
+	}
+	if(strcmp(con_status, "PDP DEACT") == 0) {
+		return PDP_DEACTIVATED;
+	}
+
+	return IP_INITIAL;
+}
+
+/**
  * @brief Establish a TCP connection
  *
  * @return bool true if success, false otherwise
- */
+*/
 bool ASIM::establishTCP() {
 	char network_apn[15];
 	DEBUG_PRINTLN(F("================= ESTABLISH TCP CONNECTION ================="));
 	// Check if sim registerd in GPRS network
-	if(!sendVerifyedCommand(F("AT+CGATT?"), F("+CG: 1OK"), 1000)) {
+	if(!sendVerifyedCommand(F("AT+CGATT?"), F("+CGATT: 1OK"), 1000)) {
 		DEBUG_PRINTLN("SIMCARD DOES NOT REGISTERD ON GPRS NETWORK");
 		return SIM_FAILED;
 	}
 	// close all old connections
-	if (!sendVerifyedCommand(F("AT+CIPSHUT"), F("SHU OK"), 3000)) {
+	if (!sendVerifyedCommand(F("AT+CIPSHUT"), F("SHUT OK"), 3000)) {
 		DEBUG_PRINTLN("CAN NOT SHUTDOWN PREVIOUS CONNECTION!");
 		return SIM_FAILED;
 	}
@@ -1406,7 +1460,7 @@ bool ASIM::establishTCP() {
  * @param server Pointer to a buffer with the server to connect to
  * @param port Pointer to a buffer witht the port to connect to
  * @return true: success, false: failure
- */
+*/
 
 
 

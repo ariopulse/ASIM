@@ -75,6 +75,17 @@
 
 #define FARSI				27
 #define ENGLISH				37
+
+#define IP_INITIAL			0
+#define IP_START			1
+#define IP_CONFIG			2
+#define IP_GPRSACT			3
+#define IP_STATUS			4
+#define TCP_CONNECTING		5
+#define TCP_CONNECTED		6
+#define TCP_CLOSING			7
+#define TCP_CLOSED			8
+#define PDP_DEACTIVATED		9
 // Configs, Feel free to change them according to your project
 #define DEFAULT_TIMOUT 		1000
 #define DEFUALT_INIT_WAIT	3000
@@ -134,10 +145,10 @@ class ASIM {
 		// USSD
 		bool sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len, uint16_t max_len);
 		// TCP/IP connection
+		uint8_t getTCPStatus();
 		bool establishTCP();
 		bool startTCP(char *server, uint16_t port);
 		bool closeTCP();
-		bool getTCPStatus();
 		bool sendTCPData(char *data, uint16_t len);
   		// Vars
 		ASIMStreamType *simSerial;

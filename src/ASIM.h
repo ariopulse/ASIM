@@ -58,7 +58,7 @@
 #define UNKNOWN_TYPE		255
 
 #define MCI					70
-#define	MTN					80
+#define	IRANCELL			80
 #define	RTEL				90
 #define VODAFONE			100
 #define ATandT				110
@@ -73,24 +73,15 @@
 #define TEXT_MODE			1
 #define PDU_MODE			0 
 
-#define FARSI_SMS			1
-#define ENGLISH_SMS			0
-
-#define SMS_SENT			1
-#define SMS_FAILED			0
-
-#define NEW_MESSAGE			1
-#define NO_NEW_MESSAGE		0
-
-#define ALL_CONTACT			0
-#define NO_CONTACT			"NC"
-
+#define FARSI				27
+#define ENGLISH				37
 // Configs, Feel free to change them according to your project
 #define DEFAULT_TIMOUT 		1000
 #define DEFUALT_INIT_WAIT	3000
 #define DEFUALT_MODE		TEXT_MODE
 #define DEFUALT_CHARSET		"GSM"
 #define SET_SMS_PARAM
+#define SET_LANG_TO_ENG
 
 // a few typedefs to keep things portable
 typedef Stream ASIMStreamType;
@@ -128,6 +119,7 @@ class ASIM {
 		bool setCharSet(char *chs);
 		bool setCLI();
 		bool setSMSParameters(uint8_t fo, uint16_t vp, uint8_t pid, uint8_t dcs);
+		bool setSIMLanguage(uint8_t lang);
 		// Calls
 		bool makeCall(char *number);
 		bool hangUp();

@@ -123,9 +123,9 @@ bool ASIM::begin(Stream &port) {
 	// clearInbox();
 
 	// Set simcard language to English
-	# ifdef SET_LANG_TO_ENG
-		setSIMLanguage(ENGLISH);
-	#endif
+	// # ifdef SET_LANG_TO_ENG
+	// 	setSIMLanguage(ENGLISH);
+	// #endif
 
 	// Flush serial port
 	flushInput();
@@ -1333,8 +1333,80 @@ bool ASIM::sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len
 	}
   return SIM_OK;
 }
+/**********************************************************************************************************************************/
+/**
+ * @brief Establish a TCP connection
+ *
+ * @return bool true if success, false otherwise
+ */
+bool ASIM::establishTCP() {
+	char network_apn[15];
+	DEBUG_PRINTLN(F("================= ESTABLISH TCP CONNECTION ================="));
+	// Check if sim registerd in GPRS network
+	if(!sendVerifyedCommand(F("AT+CGATT?"), F("+CG: 1OK"), 1000)) {
+		DEBUG_PRINTLN("SIMCARD DOES NOT REGISTERD ON GPRS NETWORK");
+		return SIM_FAILED;
+	}
+	// close all old connections
+	if (!sendVerifyedCommand(F("AT+CIPSHUT"), F("SHU OK"), 3000)) {
+		DEBUG_PRINTLN("CAN NOT SHUTDOWN PREVIOUS CONNECTION!");
+		return SIM_FAILED;
+	}
+
+	if (!sendVerifyedCommand(F("AT+CIPMUX=0"), ok_reply)) {
+		DEBUG_PRINTLN("CAN NOT SET UP IP CONNECTION");
+		return SIM_FAILED;
+	}
+
+	switch (_sim_type)
+	{
+		case IRANCELL:
+			strcpy(network_apn, "mtnirancell");
+			break;
+		case MCI:
+			strcpy(network_apn, "mcinet");
+			break;
+		case RTEL:
+			strcpy(network_apn, "RighTel");
+			break;		
+		default:
+			break;
+	}
+
+	if(!sendVerifyedCommandQuoted(F("AT+CSTT="), F(network_apn), ok_reply, 1000)) {
+		DEBUG_PRINTLN("APN DOES NOT RECOGNIZED");
+		return SIM_FAILED;
+	}
+	if(!sendVerifyedCommand(F("AT+CIICR"), ok_reply, 7000)) {
+		DEBUG_PRINTLN("CAN NOT CONNECT TO APN");
+		return SIM_FAILED;
+	}
+
+	DEBUG_PRINTLN("\t---> AT+CIFSR");
+	simSerial->println(F("AT+CIFSR"));
+	readAnswer(3000);
+	DEBUG_PRINT("\t");
+	DEBUG_PRINT(replybuffer);
+	DEBUG_PRINTLN(" <---");
+	strcpy(_modem_ip, replybuffer);
+	if(!_modem_ip) {
+		DEBUG_PRINTLN("CAN NOT ASSIGN IP ADDRESS");
+		return SIM_FAILED;
+	}
+	DEBUG_PRINT("MODEM IP IS ");
+	DEBUG_PRINTLN(_modem_ip);
 
 
+	return SIM_OK;
+}
+
+/**
+ * @brief Start a TCP connection
+ *
+ * @param server Pointer to a buffer with the server to connect to
+ * @param port Pointer to a buffer witht the port to connect to
+ * @return true: success, false: failure
+ */
 
 
 

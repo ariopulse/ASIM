@@ -134,10 +134,16 @@ class ASIM {
 		// USSD
 		bool sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len, uint16_t max_len);
 		// TCP/IP connection
+		bool establishTCP();
+		bool startTCP(char *server, uint16_t port);
+		bool closeTCP();
+		bool getTCPStatus();
+		bool sendTCPData(char *data, uint16_t len);
   		// Vars
 		ASIMStreamType *simSerial;
 
 		uint8_t _sim_type = UNKNOWN_SIM;
+		char _modem_ip[15];
 	private:
 		// Stream
 		void flushInput();

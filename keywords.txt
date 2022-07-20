@@ -1,0 +1,59 @@
+#######################################
+# Syntax Coloring Map
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ASIM		KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+cmdWrite		KEYWORD2
+checkOK			KEYWORD2
+check			KEYWORD2
+simType			KEYWORD2
+simPIN			KEYWORD2
+signalQuality		KEYWORD2
+chargeBalance		KEYWORD2
+begin			KEYWORD2
+sendSMS			KEYWORD2
+readSMS			KEYWORD2
+removeAllSMS		KEYWORD2
+saveContact		KEYWORD2
+saveContactByIndex	KEYWORD2
+read3Contact		KEYWORD2
+removeContact		KEYWORD2
+searchContact		KEYWORD2
+makeMissedCall		KEYWORD2
+makeVoiceCall		KEYWORD2
+syncRTC			KEYWORD2
+setRTC			KEYWORD2
+getRTC			KEYWORD2
+resetGSM		KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+SIM_OK		LITERAL1	
+SIM_FAILED	LITERAL1
+SIM_AT_FAILED	LITERAL1
+SIM_NOT_REG	LITERAL1
+UNKNOWN_SIM	LITERAL1
+POOR_SIGNAL	LITERAL1
+LOW_BALANCE	LITERAL1
+SIM_HAS_PIN	LITERAL1
+MCI		LITERAL1		
+MTN		LITERAL1
+RTEL		LITERAL1
+PIN_DETECT	LITERAL1
+NO_PIN		LITERAL1
+FARSI_SMS	LITERAL1
+ENGLISH_SMS	LITERAL1
+SMS_SENT	LITERAL1
+SMS_FAILED	LITERAL1
+ALL_CONTACT	LITERAL1
+NO_CONTACT	LITERAL1	

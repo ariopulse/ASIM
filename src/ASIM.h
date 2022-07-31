@@ -75,6 +75,17 @@
 
 #define FARSI				27
 #define ENGLISH				37
+
+#define IP_INITIAL			0
+#define IP_START			1
+#define IP_CONFIG			2
+#define IP_GPRSACT			3
+#define IP_STATUS			4
+#define TCP_CONNECTING		5
+#define TCP_CONNECTED		6
+#define TCP_CLOSING			7
+#define TCP_CLOSED			8
+#define PDP_DEACTIVATED		9
 // Configs, Feel free to change them according to your project
 #define DEFAULT_TIMOUT 		1000
 #define DEFUALT_INIT_WAIT	3000
@@ -133,11 +144,20 @@ class ASIM {
 		int8_t getNumSMS();
 		// USSD
 		bool sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len, uint16_t max_len);
+		// GPRS handling
+		bool enableGPRS();
+		bool disableGPRS();
 		// TCP/IP connection
+		uint8_t getTCPStatus();
+		bool establishTCP();
+		bool startTCP(char *server, uint16_t port);
+		bool closeTCP();
+		bool sendTCPData(char *data, char *response);
   		// Vars
 		ASIMStreamType *simSerial;
 
 		uint8_t _sim_type = UNKNOWN_SIM;
+		char _modem_ip[15];
 	private:
 		// Stream
 		void flushInput();
@@ -170,6 +190,10 @@ class ASIM {
 
 		uint8_t _modem_type = 0;
 		char _imei[20];
+
+		bool _gprs_on = false;
+		bool _tcp_running = false;
+		uint8_t _tcp_status = IP_INITIAL;
 };
 /**********************************************************************************************************************************/		  
 #endif

@@ -83,10 +83,10 @@ bool ASIM::begin(Stream &port) {
 	DEBUG_PRINTLN(F("Initializing....(May take 10 seconds)"));
 
 	// Turn of echo
-	sendVerifyedCommand(F("ATE0"), ok_reply);
-	delay(100);
+	// sendVerifyedCommand(F("ATE0"), ok_reply);
+	// delay(100);
 
-	// Get modem type
+	// // Get modem type
 	// _modem_type = getModemType();
 
 	// // Get modem IMEI
@@ -122,10 +122,10 @@ bool ASIM::begin(Stream &port) {
 	// // Delete all sms
 	// clearInbox();
 
-	// Set simcard language to English
-	# ifdef SET_LANG_TO_ENG
-		setSIMLanguage(ENGLISH);
-	#endif
+	// // Set simcard language to English
+	// # ifdef SET_LANG_TO_ENG
+	// 	setSIMLanguage(ENGLISH);
+	// #endif
 
 	// Flush serial port
 	flushInput();
@@ -234,7 +234,7 @@ uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
 			char c = simSerial->read();
 
 			if ((c == '\r') || (c == '\n')) continue;
-			if ((c == 'A') || (c == 'T')) continue;
+			//if ((c == 'A') || (c == 'T')) continue;
 			if (c == 0xA) {
 				if (replyidx == 0) continue; // the first 0x0A is ignored
 	
@@ -1288,7 +1288,7 @@ int8_t ASIM::getNumSMS() {
  * @param response_len The length actually read
  * @param max_len The maximum read length 
  * @return bool true if success, false otherwise
- */
+*/
 bool ASIM::sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len, uint16_t max_len) {
 	char _cmd[35] = "AT+CUSD=1,\"";
 
@@ -1333,8 +1333,343 @@ bool ASIM::sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len
 	}
   return SIM_OK;
 }
+/**********************************************************************************************************************************/
+/**
+ * @brief Enable GPRS
+ *
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::enableGPRS() {
+	char network_apn[15];
+	char *endpoint;
 
+	DEBUG_PRINTLN(F("================= ENABLING GPRS ================="));
+	// Check if sim registerd in GPRS network
+	if(!sendVerifyedCommand(F("AT+CGATT?"), F("+CGATT: 1OK"), 1000)) {
+		if(!sendVerifyedCommand(F("AT+CGATT=1"), ok_reply, 7000)) {
+			DEBUG_PRINTLN("SIMCARD DOES NOT REGISTERD ON GPRS NETWORK");
+			_gprs_on = false;
+			_tcp_running = false;
+			return SIM_FAILED;
+		}
+	}
+	// close all old connections
+	if (!sendVerifyedCommand(F("AT+CIPSHUT"), F("SHUT OK"), 4000)) {
+		DEBUG_PRINTLN("CAN NOT SHUTDOWN PREVIOUS CONNECTION!");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+	if (!sendVerifyedCommand(F("AT+CIPMUX=0"), ok_reply)) {
+		DEBUG_PRINTLN("CAN NOT SET UP IP CONNECTION");
+		return SIM_FAILED;
+	}
 
+	switch (_sim_type)
+	{
+		case IRANCELL:
+			strcpy(network_apn, "mtnirancell");
+			break;
+		case MCI:
+			strcpy(network_apn, "mcinet");
+			break;
+		case RTEL:
+			strcpy(network_apn, "RighTel");
+			break;		
+		default:
+			DEBUG_PRINTLN("UNKNOWN APN");
+			return SIM_FAILED;
+			break;
+	}
+    if (!sendVerifyedCommand(F("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\""), ok_reply, 2000)) {
+		DEBUG_PRINTLN("CAN NOT ASIGN GPRS BEARER PROFILE");
+		_gprs_on = false;
+		return false;
+	}
+
+	if(!sendVerifyedCommandQuoted(F("AT+SAPBR=3,1,\"APN\","), F(network_apn), ok_reply, 1000)) {
+		DEBUG_PRINTLN("CAN NOT BEARER PROFILE ACCESS POIN NAME");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	if(!sendVerifyedCommandQuoted(F("AT+CSTT="), F(network_apn), ok_reply, 1000)) {
+		DEBUG_PRINTLN("APN DOES NOT RECOGNIZED");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	// Turn on GPRS
+	sendVerifyedCommand(F("AT+SAPBR=1,1"), ok_reply, 7000);
+	if(!sendVerifyedCommand(F("AT+CIICR"), ok_reply, 7000)) {
+		DEBUG_PRINTLN("CAN NOT CONNECT TO APN");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	sendVerifyedCommand(F("AT+SAPBR=2,1"), ok_reply, 2000);
+	parseReplyQuoted(F("+SAPBR: "), _modem_ip, 15, ',', 2);
+	endpoint = strstr(_modem_ip, "OK");
+	if(endpoint) {
+		*endpoint = NULL;
+	}
+
+	if(!_modem_ip) {
+		DEBUG_PRINTLN("CAN NOT ASIGN IP");
+		_gprs_on = false;
+		_tcp_running = false;
+	}
+
+	DEBUG_PRINT("MODEM IP IS ");
+	DEBUG_PRINTLN(_modem_ip);
+	DEBUG_PRINTLN();
+	
+	_gprs_on = true;
+	return SIM_OK;
+}
+
+/**
+ * @brief Disable GPRS
+ *
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::disableGPRS() {
+	DEBUG_PRINTLN(F("================= DISABLING GPRS ================="));
+	// close all connections
+	if (!sendVerifyedCommand(F("AT+CIPSHUT"), F("SHUT OK"), 4000)) {
+		DEBUG_PRINTLN("CAN NOT SHUTDOWN PREVIOUS CONNECTION!");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	// close GPRS context
+	if(!sendVerifyedCommand(F("AT+SAPBR=0,1"), ok_reply, 3000)) {
+		DEBUG_PRINTLN("CAN NOT CLOSE GPRS CONTEXT");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	// Remove modem from network
+	if(!sendVerifyedCommand(F("AT+CGATT=0"), ok_reply, 3000)) {
+		DEBUG_PRINTLN("CAN NOT REMOVE MODEM FROM NETWORK");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+	
+	return SIM_OK;
+}
+/**********************************************************************************************************************************/
+/**
+ * @brief Get current status of TCP connection
+ *
+ * @return TCP status
+*/
+uint8_t ASIM::getTCPStatus() {
+	char con_status[256];
+	char *substr;
+
+	DEBUG_PRINTLN(F("================= READ TCP STATUS ================="));
+	DEBUG_PRINTLN("\t---> AT+CIPSTATUS");
+	simSerial->println(F("AT+CIPSTATUS"));
+	readAnswer(1000);
+
+	DEBUG_PRINT("\t");
+	DEBUG_PRINT(replybuffer);
+	DEBUG_PRINTLN(" <---");
+	substr = replybuffer + 9;
+	strcpy(con_status, substr);
+
+	if(strcmp(con_status, "IP INITIAL") == 0) {
+		_tcp_running = false;
+		return IP_INITIAL;
+	}
+	if(strcmp(con_status, "IP START") == 0) {
+		return IP_START;
+	}
+	if(strcmp(con_status, "IP CONFIG") == 0) {
+		return IP_CONFIG;
+	}
+	if(strcmp(con_status, "IP GPRSACT") == 0) {
+		return IP_GPRSACT;
+	}
+	if(strcmp(con_status, "IP STATUS") == 0) {
+		return IP_STATUS;
+	}
+	if(strcmp(con_status, "TCP CONNECTING") == 0) {
+		return TCP_CONNECTING;
+	}
+	if(strcmp(con_status, "CONNECT OK") == 0) {
+		_tcp_running = true;
+		return TCP_CONNECTED;
+	}
+	if(strcmp(con_status, "TCP CLOSING") == 0) {
+		return TCP_CLOSING;
+	}
+	if(strcmp(con_status, "TCP CLOSED") == 0) {
+		return TCP_CLOSED;
+	}
+	if(strcmp(con_status, "PDP DEACT") == 0) {
+		return PDP_DEACTIVATED;
+	}
+
+	return IP_INITIAL;
+}
+
+/**
+ * @brief Establish a TCP connection
+ *
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::establishTCP() {
+	DEBUG_PRINTLN(F("================= ESTABLISH TCP CONNECTION ================="));
+
+	if(!_gprs_on) {
+		_gprs_on = enableGPRS();
+		if(!_gprs_on) { 
+			DEBUG_PRINTLN("CAN NOT TURN ON GPRS");
+			_gprs_on = false;
+			_tcp_running = false;
+			return SIM_FAILED;
+		}
+	}
+
+	DEBUG_PRINTLN("\t---> AT+CIFSR");
+	simSerial->println(F("AT+CIFSR"));
+	readAnswer(3000);
+	DEBUG_PRINT("\t");
+	DEBUG_PRINT(replybuffer);
+	DEBUG_PRINTLN(" <---");
+	strcpy(_modem_ip, replybuffer);
+	if(!_modem_ip) {
+		DEBUG_PRINTLN("CAN NOT ASSIGN IP ADDRESS");
+		_gprs_on = false;
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+	DEBUG_PRINT("MODEM IP IS ");
+	DEBUG_PRINTLN(_modem_ip);
+	DEBUG_PRINTLN();
+
+	_tcp_running = true;
+
+	return SIM_OK;
+}
+
+/**
+ * @brief Start a TCP connection
+ *
+ * @param server Pointer to a buffer with the server to connect to
+ * @param port Pointer to a buffer witht the port to connect to
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::startTCP(char *server, uint16_t port) {
+	bool con_status = false;
+	DEBUG_PRINTLN(F("================= STARTING TCP ================="));
+	if((!_gprs_on) || (!_tcp_running)) {
+		con_status = establishTCP();
+		if(!con_status) {
+			DEBUG_PRINTLN("CAN NOT ESTABLISH A TCP CONNECTION");
+			_gprs_on = false;
+			_tcp_running = false;
+			return SIM_FAILED;
+		}
+	}
+	DEBUG_PRINT(F("\t --->"));
+	DEBUG_PRINT(F("AT+CIPSTART=\"TCP\",\""));
+	DEBUG_PRINT(server);
+	DEBUG_PRINT(F("\",\""));
+	DEBUG_PRINT(port);
+	DEBUG_PRINTLN(F("\""));
+
+	simSerial->print(F("AT+CIPSTART=\"TCP\",\""));
+	simSerial->print(server);
+	simSerial->print(F("\",\""));
+	simSerial->print(port);
+	simSerial->println(F("\""));
+
+	readAnswer(500);
+	DEBUG_PRINT("\t");
+	DEBUG_PRINT(replybuffer);
+	DEBUG_PRINTLN(" <---");
+	if(strcmp(replybuffer, "OK") != 0) {
+		DEBUG_PRINTLN("CAN NOT SEND REQUEST TO TCP SERVER");
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	readAnswer(4500);
+	DEBUG_PRINT("\t");
+	DEBUG_PRINT(replybuffer);
+	DEBUG_PRINTLN(" <---");
+	if(strcmp(replybuffer, "CONNECT OK") != 0) {
+		DEBUG_PRINTLN("CAN NOT CONNECT TO TCP SERVER");
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	return SIM_OK;
+}
+
+/**
+ * @brief Close the TCP connection
+ *
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::closeTCP() {
+	DEBUG_PRINTLN(F("================= CLOSING TCP ================="));
+	return sendVerifyedCommand(F("AT+CIPCLOSE"), F("CLOSE OK"));
+}
+
+/**
+ * @brief Send data via TCP
+ *
+ * @param data Pointer to a buffer with the data to send
+ * @param response Pointer to buffer to store server response
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::sendTCPData(char *data, char *response) {
+	char *substr;
+	bool send_result = false;
+
+	DEBUG_PRINTLN(F("================= SENDING TCP MESSAGE ================="));
+	if(!_tcp_running) {
+		DEBUG_PRINTLN("CAN NOT DETECT TCP CONNECTION");
+		return SIM_FAILED;
+	}
+
+	send_result = sendVerifyedCommand(F("AT+CIPSEND"), F("> "));
+	if(!send_result) {
+		DEBUG_PRINTLN("CAN NOT INIT TCP MESSAGE");
+		_tcp_running = false;
+		return SIM_FAILED;
+	}
+
+	simSerial->print(data);
+	simSerial->write(0x1A);
+
+	DEBUG_PRINT(data);
+	DEBUG_PRINTLN(" ^Z");
+	
+	readAnswer(7000);
+	DEBUG_PRINTLN(replybuffer);
+
+	if ((!strstr(replybuffer, "SEND OK"))) {
+		DEBUG_PRINTLN("FAILED TO SEND TCP DATA");
+		return SIM_FAILED;
+	}
+
+	substr = replybuffer + 7;
+	strcpy(response, substr);
+
+	return SIM_OK;
+}
+/**********************************************************************************************************************************/
 
 
 

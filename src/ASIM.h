@@ -144,12 +144,15 @@ class ASIM {
 		int8_t getNumSMS();
 		// USSD
 		bool sendUSSD(char *ussd_code, char *ussd_response, uint16_t *response_len, uint16_t max_len);
+		// GPRS handling
+		bool enableGPRS();
+		bool disableGPRS();
 		// TCP/IP connection
 		uint8_t getTCPStatus();
 		bool establishTCP();
 		bool startTCP(char *server, uint16_t port);
 		bool closeTCP();
-		bool sendTCPData(char *data, uint16_t len);
+		bool sendTCPData(char *data, char *response);
   		// Vars
 		ASIMStreamType *simSerial;
 
@@ -187,6 +190,10 @@ class ASIM {
 
 		uint8_t _modem_type = 0;
 		char _imei[20];
+
+		bool _gprs_on = false;
+		bool _tcp_running = false;
+		uint8_t _tcp_status = IP_INITIAL;
 };
 /**********************************************************************************************************************************/		  
 #endif

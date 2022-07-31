@@ -147,6 +147,18 @@ class ASIM {
 		// GPRS handling
 		bool enableGPRS();
 		bool disableGPRS();
+		// HTTP
+		bool initHttp();
+		bool termHttp();
+		bool setHttpParameter(ASIMFlashString parameter, const char *value);
+		bool setHttpParameter(ASIMFlashString parameter, ASIMFlashString value);
+		bool setHttpParameter(ASIMFlashString parameter, int32_t value);
+		bool setHttpDataParameter(uint32_t size, uint32_t max_wait);
+		bool setHttpAction(uint8_t method, uint16_t *status, uint16_t *data_len, int32_t timeout);
+		bool readHttpResponse(char *response, uint16_t response_len);
+		bool postHttpRequest(char *url, char *cont_type, char *data, uint16_t data_len, uint16_t timeout, uint16_t *status, uint16_t *response_len, char *response);
+		bool postHttpRequest(char *url, char *cont_type, char *token, char *data, uint16_t data_len, uint16_t timeout, uint16_t *status, uint16_t *response_len, char *response);
+		bool setSSL(bool state);
 		// TCP/IP connection
 		uint8_t getTCPStatus();
 		bool establishTCP();

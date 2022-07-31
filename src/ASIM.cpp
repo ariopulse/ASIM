@@ -1011,6 +1011,71 @@ bool ASIM::makeMissedCall(char *number, uint16_t hangup_delay) {
 
 	return succeed;
 }
+
+/**
+ * @brief Make voice call with AMR file
+ *
+ * @param number The reciever number
+ * @param file_id The AMR file ID
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::makeAMRVoiceCall(char *number, uint16_t file_id) {
+	char amr_cmd[40];
+	DEBUG_PRINTLN(F("================= MAKING VOICE CALL WITH AMR FILE ================="));
+	
+	sprintf(amr_cmd, "AT+CREC=4,\"C:\\User\\%d.amr\",0,90", file_id);
+	// AT+CREC=4,"C:\User\file_id.amr",0,90
+	makeCall(number);
+	// After user pick the phone on
+	// TODO: Check if user picked the phone on
+	return sendVerifyedCommand(amr_cmd, ok_reply);
+}
+
+/**
+ * @brief Get the number of the incoming call
+ *
+ * @param phone_number Pointer to a buffer to hold the incoming caller's phone number
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::incomeCallNumber(char *phone_number) {
+	char *substr, *endpoint;
+	// RING+CLIP: "<incoming phone number>",145,"",0,"",0
+	// or
+	// +CLIP: "<incoming phone number>",145,"",0,"",0
+	readAnswer(); // reads incoming phone number line
+	if(strstr(replybuffer, "RING")) {
+		if(strstr(replybuffer, "+CLIP")) {
+			substr = replybuffer + 12;
+		}
+		else {
+			DEBUG_PRINTLN("CALLER ID NOTIFICATION IS DISABELD");
+			return SIM_FAILED;
+		}
+	}
+	else {
+		if(strstr(replybuffer, "+CLIP")) {
+			substr = replybuffer + 8;
+		}
+		else {
+			DEBUG_PRINTLN("NO INCOMING CALL DETECTED");
+			return SIM_FAILED;			
+		}
+	}
+
+	endpoint = strstr(substr, "\"");
+	if(!endpoint) {
+		DEBUG_PRINTLN("CAN NOT PARSE INCOME PHONE NUMBER");
+		return SIM_FAILED;
+	}
+	*endpoint = NULL;
+
+	DEBUG_PRINT(F("Phone Number: "));
+	DEBUG_PRINTLN(substr);
+	strcpy(phone_number, substr);
+
+	_incoming_call = false;
+	return SIM_OK;
+}
 /**********************************************************************************************************************************/
 /**
  * @brief Delete all sms in inbox

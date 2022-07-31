@@ -135,6 +135,8 @@ class ASIM {
 		bool makeCall(char *number);
 		bool hangUp();
 		bool makeMissedCall(char *number, uint16_t hangup_delay);
+		bool makeAMRVoiceCall(char *number, uint16_t file_id);
+		bool incomeCallNumber(char *phone_number);
 		// SMS
 		bool clearInbox();
 		bool deleteSMS(uint8_t message_index);
@@ -209,6 +211,8 @@ class ASIM {
 
 		uint8_t _modem_type = 0;
 		char _imei[20];
+
+		bool _incoming_call = false;
 
 		bool _gprs_on = false;
 		bool _tcp_running = false;

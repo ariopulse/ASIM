@@ -1466,6 +1466,372 @@ bool ASIM::disableGPRS() {
 }
 /**********************************************************************************************************************************/
 /**
+ * @brief Initialize HTTP
+ *
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::initHttp() {
+	DEBUG_PRINTLN(F("================= INIT HTTP ================="));
+	return sendVerifyedCommand(F("AT+HTTPINIT"), ok_reply);
+}
+
+/**
+ * @brief Terminate HTTP
+ *
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::termHttp() {
+	DEBUG_PRINTLN(F("================= TERMINATE HTTP ================="));
+  	return sendVerifyedCommand(F("AT+HTTPTERM"), ok_reply);
+}
+
+/**
+ * @brief Send HTTP parameter
+ *
+ * @param parameter Pointer to a buffer with the parameter to send
+ * @param value Pointer to a buffer with the parameter value
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setHttpParameter(ASIMFlashString parameter, const char *value) {
+	char param_cmd[1024];
+	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
+	flushInput();
+
+	sprintf(param_cmd, "AT+HTTPPARA=\"%s\",\"%s\"", parameter, value);
+	return sendVerifyedCommand(param_cmd, ok_reply);
+
+	// DEBUG_PRINT(F("\t---> "));
+	// DEBUG_PRINT(F("AT+HTTPPARA=\""));
+	// DEBUG_PRINT(parameter);
+	// DEBUG_PRINTLN('"');
+
+	// simSerial->print(F("AT+HTTPPARA=\""));
+	// simSerial->print(parameter);
+	// simSerial->print(F("\",\""));
+	// simSerial->print(value);
+	// simSerial->println('"');
+
+}
+
+/**
+ * @brief Send HTTP parameter
+ *
+ * @param parameter Pointer to a buffer with the parameter to send
+ * @param value Pointer to a buffer with the parameter value
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setHttpParameter(ASIMFlashString parameter, ASIMFlashString value) {
+	char param_cmd[1024];
+	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
+	flushInput();
+
+	sprintf(param_cmd, "AT+HTTPPARA=\"%s\",\"%s\"", parameter, value);
+	return sendVerifyedCommand(param_cmd, ok_reply);
+}
+
+/**
+ * @brief Send HTTP parameter
+ *
+ * @param parameter Pointer to a buffer with the parameter to send
+ * @param value The parameter value
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setHttpParameter(ASIMFlashString parameter, int32_t value) {
+	char param_cmd[50];
+	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
+	sprintf(param_cmd, "AT+HTTPPARA=\"%s\",\"%u\"", parameter, value);
+
+	flushInput();
+
+	return sendVerifyedCommand(param_cmd, ok_reply);
+}
+
+/**
+ * @brief Begin sending data via HTTP
+ *
+ * @param size The amount of data to be sent in bytes
+ * @param maxTime The maximum amount of time in which to send the data, in milliseconds
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setHttpDataParameter(uint32_t size, uint32_t max_wait) {
+	char param_data_cmd[50];
+	DEBUG_PRINTLN(F("================= SET HTTP DATA PARAMETER ================="));
+	sprintf(param_data_cmd, "AT+HTTPDATA=%u,%u", size, max_wait);
+	
+	flushInput();
+
+	return sendVerifyedCommand(param_data_cmd, F("DOWNLOAD"));
+
+	// DEBUG_PRINT(F("\t---> "));
+	// DEBUG_PRINT(F("AT+HTTPDATA="));
+	// DEBUG_PRINT(size);
+	// DEBUG_PRINT(',');
+	// DEBUG_PRINTLN(max_wait);
+
+	// simSerial->print(F("AT+HTTPDATA="));
+	// simSerial->print(size);
+	// simSerial->print(",");
+	// simSerial->println(max_wait);
+
+	// return expectReply(F("DOWNLOAD"));
+}
+
+/**
+ * @brief Make an HTTP Request
+ *
+ * @param method The request method:
+ * * 0: GET
+ * * 1: POST
+ * * 2: HEAD
+ * @param status Pointer to a uint16_t to hold the request status as an RFC2616
+ * @param datalen Pointer to the  a `uint16_t` to hold the length of the data read
+ * @param timeout Timeout for waiting for response
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setHttpAction(uint8_t method, uint16_t *status, uint16_t *data_len, int32_t timeout) {
+	DEBUG_PRINTLN(F("================= MAKE HTTP ACTION ================="));
+	if (!sendVerifyedCommand(F("AT+HTTPACTION="), method, ok_reply, 2000)) {
+		return SIM_FAILED;
+	}
+
+	readAnswer(timeout);
+
+	if (!parseReply(F("+HTTPACTION:"), status, ',', 1)) {
+		DEBUG_PRINTLN(F("UNKNOWN STATUS CODE"));
+		return SIM_FAILED;
+	}
+  	if (!parseReply(F("+HTTPACTION:"), data_len, ',', 2)) {
+		DEBUG_PRINTLN(F("UNKNOWN RESPONSE LENGTH"));
+		return SIM_FAILED;
+	}
+
+	return SIM_OK;
+}
+
+/**
+ * @brief Read all available HTTP data
+ *
+ * @param data_len Pointer to the  a `uint16_t` to hold the length of the data read
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::readHttpResponse(char *response, uint16_t response_len) {
+	char *substr;
+	uint8_t len_index = 0;
+	DEBUG_PRINTLN(F("================= READ HTTP RESPONSE ================="));
+	getReply(F("AT+HTTPREAD"));
+	if(response_len <10)
+		len_index = 1;
+	else if((response_len >= 10) && (response_len < 100))
+		len_index = 2;
+	else if((response_len >= 100) && (response_len < 1000))
+		len_index = 3;
+	else if(response_len >= 1000) 
+		len_index = 4;
+	else 
+		len_index = 0;
+	
+	substr = replybuffer + 11 + len_index;
+	strncpy(response, substr, strlen(substr));
+	if(strlen(response) <= 0) {
+		DEBUG_PRINTLN("CAN NOT PARSE RESPONSE");
+		return SIM_FAILED;
+	}
+	
+	return SIM_OK;
+}
+
+/**
+ * @brief Start an HTTP POST request
+ *
+ * @param url Pointer to a buffer with the URL to POST
+ * @param cont_type The message content type
+ * @param data Pointer to a buffer with the POST data to be sent
+ * @param data_len The length of the POST data
+ * @param timeout The timeout of sending the data to the server
+ * @param status Pointer to a uint16_t to hold the request status as an RFC2616
+ * @param response_len Pointer to the  a `uint16_t` to hold the length of the response
+ * @param response Pointer to the  a buffer to hold server response
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::postHttpRequest(char *url, char *cont_type, char *data, uint16_t data_len, uint16_t timeout, uint16_t *status, uint16_t *response_len, char *response) {
+	bool con_status = false;
+
+	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
+
+	_gprs_on = true;
+	if(!_gprs_on) {
+		con_status = enableGPRS();
+		if(!con_status) {
+			DEBUG_PRINTLN("CAN NOT ENABLE GPRS");
+			_gprs_on = false;
+			_tcp_running = false;
+			return SIM_FAILED;
+		}
+	}
+
+	// Handle any pending
+	termHttp();
+
+	// Initialize and set parameters
+	if (!initHttp()) {
+		DEBUG_PRINTLN("CAN NOT INIT HTTP"); 
+		return SIM_FAILED;
+	}
+	
+	if (!setHttpParameter(F("CID"), 1)) {
+		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
+		return SIM_FAILED;
+	}
+
+	if (!setHttpParameter(F("URL"), F(url))) {
+		DEBUG_PRINTLN("CAN NOT SET URL");
+		return SIM_FAILED;
+	}
+
+	if (!setHttpParameter(F("CONTENT"), F(cont_type))) {
+		DEBUG_PRINTLN("CAN NOT SET URL");
+		return SIM_FAILED;
+	}
+
+	if (!setHttpDataParameter(data_len, timeout)) {
+		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
+		return SIM_FAILED;
+	}
+
+	if(sendVerifyedCommand(data, ok_reply)) {
+		DEBUG_PRINTLN("CAN NOT SEND DATA TO SERVER");
+		return SIM_FAILED;
+	}
+	
+	if(!setHttpAction(1, status, response_len, 10000)) {
+		DEBUG_PRINTLN("CAN NOT SEND POST REQUEST");
+		return SIM_FAILED;
+	}
+
+	if(!readHttpResponse(response, *response_len)) {
+		DEBUG_PRINTLN("SERVER DID NOT SEND RESPOND");
+	}
+
+	DEBUG_PRINT(F("Status: "));
+	DEBUG_PRINTLN(*status);
+	DEBUG_PRINT(F("Len: "));
+	DEBUG_PRINTLN(*response_len);
+	DEBUG_PRINT(F("Response: "));
+	DEBUG_PRINTLN(response);
+
+	if(!termHttp()) {
+		DEBUG_PRINTLN("CANNOT TERMINATE HTTP");
+		return SIM_FAILED;
+	}
+
+	return SIM_OK;
+}
+
+/**
+ * @brief Start an HTTP POST request
+ *
+ * @param url Pointer to a buffer with the URL to POST
+ * @param cont_type The message content type
+ * @param token The user costume data such as token
+ * @param data Pointer to a buffer with the POST data to be sent
+ * @param data_len The length of the POST data
+ * @param timeout The timeout of sending the data to the server
+ * @param status Pointer to a uint16_t to hold the request status as an RFC2616
+ * @param response_len Pointer to the  a `uint16_t` to hold the length of the response
+ * @param response Pointer to the  a buffer to hold server response
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::postHttpRequest(char *url, char *cont_type, char *token, char *data, uint16_t data_len, uint16_t timeout, uint16_t *status, uint16_t *response_len, char *response) {
+	bool con_status = false;
+
+	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
+
+	_gprs_on = true;
+	if(!_gprs_on) {
+		con_status = enableGPRS();
+		if(!con_status) {
+			DEBUG_PRINTLN("CAN NOT ENABLE GPRS");
+			_gprs_on = false;
+			_tcp_running = false;
+			return SIM_FAILED;
+		}
+	}
+
+	// Handle any pending
+	termHttp();
+
+	// Initialize and set parameters
+	if (!initHttp()) {
+		DEBUG_PRINTLN("CAN NOT INIT HTTP"); 
+		return SIM_FAILED;
+	}
+	
+	if (!setHttpParameter(F("CID"), 1)) {
+		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
+		return SIM_FAILED;
+	}
+
+	if (!setHttpParameter(F("USERDATA"), F(token))) {
+		DEBUG_PRINTLN("CAN NOT SET USER DATA");
+		return SIM_FAILED;
+	}
+
+	if (!setHttpParameter(F("URL"), F(url))) {
+		DEBUG_PRINTLN("CAN NOT SET URL");
+		return SIM_FAILED;
+	}
+
+	if (!setHttpParameter(F("CONTENT"), F(cont_type))) {
+		DEBUG_PRINTLN("CAN NOT SET URL");
+		return SIM_FAILED;
+	}
+
+	if (!setHttpDataParameter(data_len, timeout)) {
+		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
+		return SIM_FAILED;
+	}
+
+	if(sendVerifyedCommand(data, ok_reply)) {
+		DEBUG_PRINTLN("CAN NOT SEND DATA TO SERVER");
+		return SIM_FAILED;
+	}
+	
+	if(!setHttpAction(1, status, response_len, 10000)) {
+		DEBUG_PRINTLN("CAN NOT SEND POST REQUEST");
+		return SIM_FAILED;
+	}
+
+	if(!readHttpResponse(response, *response_len)) {
+		DEBUG_PRINTLN("SERVER DID NOT SEND RESPOND");
+	}
+
+	DEBUG_PRINT(F("Status: "));
+	DEBUG_PRINTLN(*status);
+	DEBUG_PRINT(F("Len: "));
+	DEBUG_PRINTLN(*response_len);
+	DEBUG_PRINT(F("Response: "));
+	DEBUG_PRINTLN(response);
+
+	if(!termHttp()) {
+		DEBUG_PRINTLN("CANNOT TERMINATE HTTP");
+		return SIM_FAILED;
+	}
+
+	return SIM_OK;
+}
+
+/**
+ * @brief Enable or disable SSL
+ *
+ * @param state true for enable and false for disable
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setSSL(bool state) {
+	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
+  	return sendVerifyedCommand(F("AT+HTTPSSL="), state ? 1 : 0, ok_reply);
+}
+/**********************************************************************************************************************************/
+/**
  * @brief Get current status of TCP connection
  *
  * @return TCP status

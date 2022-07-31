@@ -165,7 +165,14 @@ class ASIM {
 		bool startTCP(char *server, uint16_t port);
 		bool closeTCP();
 		bool sendTCPData(char *data, char *response);
-  		// Vars
+		// RTC
+		bool initRTC(uint8_t mode);
+		bool setRTC(uint8_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t min, uint8_t sec, int8_t zz);
+		bool readRTC(uint8_t *year, uint8_t *month, uint8_t *day, uint8_t *hr, uint8_t *min, uint8_t *sec);
+  		bool syncNTPTime(uint16_t *error_code, char *ntp_server, uint8_t region);
+  		// PWM
+		bool setPWM(uint8_t channel, uint16_t period, uint8_t duty);
+		// Vars
 		ASIMStreamType *simSerial;
 
 		uint8_t _sim_type = UNKNOWN_SIM;

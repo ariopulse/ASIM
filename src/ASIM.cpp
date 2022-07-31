@@ -2036,6 +2036,142 @@ bool ASIM::sendTCPData(char *data, char *response) {
 	return SIM_OK;
 }
 /**********************************************************************************************************************************/
+/**
+ * @brief Enable the Real Time Clock
+ *
+ * @param mode  1: Enable 0: Disable
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::initRTC(uint8_t mode) {
+	DEBUG_PRINTLN(F("================= INIT LOCAL RTC ================="));
+	if (!sendVerifyedCommand(F("AT+CLTS="), mode, ok_reply, 500)) {
+		return SIM_FAILED;
+	}
+	return sendVerifyedCommand(F("AT&W"), ok_reply, 500);
+}
+
+/**
+ * @brief Set the Real Time Clock
+ *
+ *
+ * @param year year data
+ * @param month month data
+ * @param day day data
+ * @param hr hour data
+ * @param min minute data
+ * @param sec seconde data
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setRTC(uint8_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t min, uint8_t sec, int8_t zz) {
+	char rtc_cmd[50];
+	DEBUG_PRINTLN(F("================= SET RTC ================="));
+	sprintf(rtc_cmd,"AT+CCLK=\"%02d/%02d/%02d,%02d:%02d:%02d+%d\"", year, month, day, hr, min, sec, zz);
+
+	return sendVerifyedCommand(rtc_cmd, ok_reply);
+}
+
+/**
+ * @brief Read the Real Time Clock
+ *
+ * @param year Pointer to a uint8_t to be set with year data
+ * @param month Pointer to a uint8_t to be set with month data **NOT WORKING**
+ * @param day Pointer to a uint8_t to be set with day data **NOT WORKING**
+ * @param hr Pointer to a uint8_t to be set with hour data **NOT WORKING**
+ * @param min Pointer to a uint8_t to be set with minute data **NOT WORKING**
+ * @param sec Pointer to a uint8_t to be set with year data **NOT WORKING**
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::readRTC(uint8_t *year, uint8_t *month, uint8_t *day, uint8_t *hr, uint8_t *min, uint8_t *sec) {
+	DEBUG_PRINTLN(F("================= GET RTC ================="));
+	getReply(F("AT+CCLK?"), (uint16_t) 1000); //Get RTC timeout 10 sec
+	if (strncmp(replybuffer, "+CCLK: ", 7) != 0)
+		return false;
+
+	char *p = replybuffer+8;	// skip +CCLK: "
+	
+	// Parse date
+	int reply = atoi(p); 
+	*year = (uint8_t) reply; 
+	p+=3;	// skip 3 char
+
+	reply = atoi(p);
+	*month = (uint8_t) reply;
+	p+=3;
+
+	reply = atoi(p);
+	*day = (uint8_t) reply;
+	p+=3;
+
+	reply = atoi(p);
+	*hr = (uint8_t) reply;
+	p+=3;
+
+	reply = atoi(p);
+	*min = (uint8_t) reply;
+	p+=3;
+
+	reply = atoi(p);
+	*sec = (uint8_t) reply;
+
+	return SIM_OK;
+}
+
+/**
+ * @brief Syncronise time with NTP server
+ *
+ * @param ntpserver The NTP server buffer
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::syncNTPTime(uint16_t *error_code, char *ntp_server, uint8_t region) {
+	char ntp_cmd[40];
+	DEBUG_PRINTLN(F("================= SYNC TIME WITH NTP SERVER ================="));
+	if(!sendVerifyedCommand(F("AT+CNTPCID=1"), ok_reply)) {
+		DEBUG_PRINTLN(F("CAN NOT ENABLE NTP SERVER"));
+		return SIM_FAILED;
+	}
+	if(strlen(ntp_server) > 1) {
+		sprintf(ntp_cmd, "AT+CNTP=\"%s\",%d", ntp_server, region);
+	}
+	else {
+		sprintf(ntp_cmd, "AT+CNTP=\"pool.ntp.org\",%d", region);
+	}
+
+	if(!sendVerifyedCommand(ntp_cmd, ok_reply, 3000)) {
+		DEBUG_PRINTLN(F("CAN NOT CONNECT TO NTP SERVER"));
+		return SIM_FAILED;
+	}
+
+	sendVerifyedCommand(F("AT+CNTP"), ok_reply, 5000);
+	if (!parseReply(F("+CNTP:"), error_code)) {
+		DEBUG_PRINTLN(F("SERVER DID NOT RESPOND"));
+		return SIM_FAILED;	
+	}
+
+	return SIM_OK;
+}
+/**********************************************************************************************************************************/
+/**
+ * @brief Set the PWM Period and Duty Cycle
+ *
+ * @param period The PWM period
+ * @param duty The PWM duty cycle
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::setPWM(uint8_t channel, uint16_t period, uint8_t duty) {
+	char pwm_cmd[20];
+	DEBUG_PRINTLN(F("================= SET PWM ================="));
+	if(period > 2000) {
+		DEBUG_PRINTLN(F("PWM PERIOD CAN NOT EXCEED 2000"));
+		return SIM_FAILED;
+	}
+	if(duty > 100) {
+		DEBUG_PRINTLN(F("PWM DUTY CYCLE CAN NOT EXCEED 100"));
+		return SIM_FAILED;
+	}
+
+	sprintf(pwm_cmd, "AT+SPWM=%d,%d,%d", channel, period, duty);
+	return sendVerifyedCommand(pwm_cmd, ok_reply);
+}
 
 
 

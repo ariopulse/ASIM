@@ -107,7 +107,7 @@ class ASIM {
 	public:
 		// Basic
 		ASIM(byte in_pwr, byte pwr_key, byte rst);
-		bool begin(ASIMStreamType &port);
+		bool begin(ASIMStreamType &port, int setup_wait);
 		// Stream
 		int available(void);
 		size_t write(uint8_t x);

@@ -24,7 +24,7 @@ ASIM::ASIM(byte in_pwr, byte pwr_key, byte rst) {
  * @param port the serial connection to use to connect
  * @return bool true on success, false if a connection cannot be made
 */
-bool ASIM::begin(Stream &port) {
+bool ASIM::begin(ASIMStreamType &port, int setup_wait) {
 	simSerial = &port;
 
 	if(_in_pwr_pin > 0) {
@@ -45,7 +45,7 @@ bool ASIM::begin(Stream &port) {
 		digitalWrite(_pwr_key_pin, LOW);
 	}
 
-	delay(DEFUALT_INIT_WAIT);
+	delay(setup_wait);
 	DEBUG_PRINTLN(F("================= ESTABLIS COMMUNICATON ================="));
 	DEBUG_PRINTLN(F("Try communicate with modem (May take 10 seconds to find cellular network)"));
 

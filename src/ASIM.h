@@ -95,7 +95,7 @@
 #define DEFUALT_MODE		TEXT_MODE
 #define DEFUALT_CHARSET		"GSM"
 #define SET_SMS_PARAM
-#define SET_LANG_TO_ENG
+// #define SET_LANG_TO_ENG
 
 // a few typedefs to keep things portable
 typedef Stream ASIMStreamType;

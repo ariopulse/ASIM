@@ -126,9 +126,9 @@ bool ASIM::begin(ASIMStreamType &port, int setup_wait) {
 	clearInbox();
 
 	// Set simcard language to English
-	// # ifdef SET_LANG_TO_ENG
-	// 	setSIMLanguage(ENGLISH);
-	// #endif
+	# ifdef SET_LANG_TO_ENG
+		setSIMLanguage(ENGLISH);
+	#endif
 
 	// Flush serial port
 	flushInput();
@@ -208,7 +208,7 @@ void ASIM::flushInput() {
 }
 
 /**
- * @brief Read a single line or up to 254 bytes
+ * @brief Read a single line or up to 254 bytes without new line
  *
  * @param timeout Reply timeout
  * @param multiline true: read the maximum amount. false: read up to the second
@@ -216,14 +216,15 @@ void ASIM::flushInput() {
  * @return uint8_t the number of bytes read
  */
 uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
-	uint16_t replyidx = 0;
+	uint16_t replyidx = 0, o_index = 255;
+	bool wiat_for_ok = false;
+	bool end_flag = false;
 
 	while (timeout--) {
 
 		while (simSerial->available()) {
 			char c = simSerial->read();
 			if ((c == '\r') || (c == '\n')) continue;
-			//if ((c == 'A') || (c == 'T')) continue;
 			if (c == 0xA) {
 				if (replyidx == 0) continue; // the first 0x0A is ignored
 	
@@ -232,8 +233,28 @@ uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
 				  break;
 				}
 			}
+
 			replybuffer[replyidx] = c;
 			replyidx++;
+
+			if(c == 'O') {
+				o_index = replyidx;
+				wiat_for_ok = true;
+			}
+			if((wiat_for_ok) && (o_index != replyidx)) {
+				if(c == 'K') {
+					end_flag = true;
+				}
+				else {
+					wiat_for_ok = false;
+				}
+			}
+
+			if(end_flag) {
+				timeout = 0;
+				break;
+			}
+
 			if (replyidx > 253) {
 				timeout = 0;
 				break;
@@ -248,7 +269,7 @@ uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
 }
 
 /**
- * @brief Read a single line or up to 254 bytes
+ * @brief Read a single line or up to 254 bytes with new line
  *
  * @param timeout Reply timeout
  * @param multiline true: read the maximum amount. false: read up to the second

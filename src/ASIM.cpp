@@ -2,14 +2,11 @@
 #include "ASIM.h"
 
 char replybuffer[255];
-/**********************************************************************************************************************************/
+/*************************************************************************************************************/
 /**
  * @brief Construct a new Ario_SIM object
  *
- * @param in_pwr The 4.1v regulator enable pin
- * @param pwr_key The power key input pin in GSM
- * @param rst The reset pin of GSM
- * @param display_msg Show debugging report on serial port
+ * @param port The serial port of GSM
 */
 ASIM::ASIM(byte in_pwr, byte pwr_key, byte rst) {
 	_in_pwr_pin = in_pwr;
@@ -58,8 +55,12 @@ bool ASIM::begin(Stream &port) {
 	while (timeout > 0) {
 		while (simSerial->available())
 		 	simSerial->read();
-		if (sendVerifyedCommand(F("AT"), ok_reply, 500))
+		if (sendVerifyedCommand(F("AT"), F("ATOK"), 500)) {
 			break;
+		}
+		if (sendVerifyedCommand(F("AT"), ok_reply, 500)) {
+			break;
+		}
 		while (simSerial->available())
 			simSerial->read();
 		if (sendVerifyedCommand(F("AT"), F("AT"), 500))
@@ -70,12 +71,14 @@ bool ASIM::begin(Stream &port) {
 
 	if(timeout <= 0) {
 		DEBUG_PRINTLN("Timeout: No response to AT... last attempt.");
-		sendVerifyedCommand(F("AT"), ok_reply, 500);
+		sendVerifyedCommand(F("AT"), F("ATOK"), 500);
 		delay(1000);
 	}
 
-	if(!sendVerifyedCommand(F("AT"), ok_reply, 500)) {
-		return SIM_FAILED;
+	if(!sendVerifyedCommand(F("AT"), F("ATOK"), 500)) {
+		if(!sendVerifyedCommand(F("AT"), ok_reply, 500)) {
+			return SIM_FAILED;
+		}
 	}
 
 	DEBUG_PRINTLN(F("================= INIT MODEM ================="));
@@ -83,46 +86,46 @@ bool ASIM::begin(Stream &port) {
 	DEBUG_PRINTLN(F("Initializing....(May take 10 seconds)"));
 
 	// Turn of echo
-	// sendVerifyedCommand(F("ATE0"), ok_reply);
-	// delay(100);
+	sendVerifyedCommand(F("ATE0"), F("ATE0OK"));
+	delay(100);
 
-	// // Get modem type
-	// _modem_type = getModemType();
+	// Get modem type
+	_modem_type = getModemType();
 
-	// // Get modem IMEI
+	// Get modem IMEI
 	// getIMEI();
 
 	// Get SIM card type
 	_sim_type = getSimType();
 
-	// // Check modem status
+	// Check modem status
 	// checkModemStatus();
 
-	// // Set baudrate
-	// setBaud(9600);
+	// Set baudrate
+	setBaud(9600);
 
-	// // Set message mode
-	// #ifdef DEFUALT_MODE
-	// 	setMessageFormat(DEFUALT_MODE);
-	// #endif
+	// Set message mode
+	#ifdef DEFUALT_MODE
+		setMessageFormat(DEFUALT_MODE);
+	#endif
 
-	// // Set char set
-	// #ifdef	DEFUALT_CHARSET
-	// 	setCharSet(DEFUALT_CHARSET);
-	// #endif
+	// Set char set
+	#ifdef	DEFUALT_CHARSET
+		setCharSet(DEFUALT_CHARSET);
+	#endif
 
-	// // Set CLI
-	// setCLI();
+	// Set CLI
+	setCallerIdNotification();
 
-	// // Set SMS parameters
-	// # ifdef SET_SMS_PARAM
-	// 	setSMSParameters(49, 167, 0, 0);
-	// #endif
+	// Set SMS parameters
+	# ifdef SET_SMS_PARAM
+		setSMSParameters(49, 167, 0, 0);
+	#endif
 
-	// // Delete all sms
-	// clearInbox();
+	// Delete all sms
+	clearInbox();
 
-	// // Set simcard language to English
+	// Set simcard language to English
 	// # ifdef SET_LANG_TO_ENG
 	// 	setSIMLanguage(ENGLISH);
 	// #endif
@@ -134,12 +137,13 @@ bool ASIM::begin(Stream &port) {
 	return SIM_OK;
 }
 /**********************************************************************************************************************************/
+
 /**
  * @brief Serial data available
  *
  * @return int
 */
-inline int ASIM::available(void) { 
+int ASIM::available(void) { 
 	return simSerial->available(); 
 } 
 
@@ -149,7 +153,7 @@ inline int ASIM::available(void) {
  * @param x
  * @return size_t
 */
-inline size_t ASIM::write(uint8_t x) {
+size_t ASIM::write(uint8_t x) {
 	return simSerial->write(x);
 } 
 
@@ -158,8 +162,17 @@ inline size_t ASIM::write(uint8_t x) {
  *
  * @return int
 */
-inline int ASIM::read(void) { 
+int ASIM::read(void) { 
 	return simSerial->read(); 
+}
+
+/**
+ * @brief Serial readBytes
+ * 
+ * @return size_t
+ */
+size_t ASIM::readBytes(char * buffer, uint16_t sizeOfBuffer) {
+	return simSerial->readBytes(buffer, sizeOfBuffer);
 }
 
 /**
@@ -167,7 +180,7 @@ inline int ASIM::read(void) {
  *
  * @return int
 */
-inline int ASIM::peek(void) { 
+int ASIM::peek(void) { 
 	return simSerial->peek(); 
 } 
 
@@ -175,7 +188,7 @@ inline int ASIM::peek(void) {
  * @brief Flush the serial data
  *
 */
-inline void ASIM::flush() { 
+void ASIM::flush() { 
 	simSerial->flush(); 
 } 
 
@@ -195,26 +208,6 @@ void ASIM::flushInput() {
 }
 
 /**
- * @brief Read what comse from serial port up to 254 bytes or desired length
- *
- * @param read_length Desired length for read
- * @return uint16_t the length of the incoming message
-*/
-uint16_t ASIM::readRaw(uint16_t read_length) {
-	uint16_t idx = 0;
-	while (read_length && (idx < sizeof(replybuffer) - 1)) {
-		if (simSerial->available()) {
-			replybuffer[idx] = simSerial->read();
-			idx++;
-			read_length--;
-		}
-	}
-	replybuffer[idx] = 0;
-
-	return idx;
-}
-
-/**
  * @brief Read a single line or up to 254 bytes
  *
  * @param timeout Reply timeout
@@ -226,13 +219,9 @@ uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
 	uint16_t replyidx = 0;
 
 	while (timeout--) {
-		if (replyidx >= 254) {
-			break;
-		}
 
 		while (simSerial->available()) {
 			char c = simSerial->read();
-
 			if ((c == '\r') || (c == '\n')) continue;
 			//if ((c == 'A') || (c == 'T')) continue;
 			if (c == 0xA) {
@@ -245,6 +234,10 @@ uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
 			}
 			replybuffer[replyidx] = c;
 			replyidx++;
+			if (replyidx > 253) {
+				timeout = 0;
+				break;
+			}
 		}
 
 		if (timeout == 0) break;
@@ -253,7 +246,34 @@ uint8_t ASIM::readAnswer(uint16_t timeout, bool multiline) {
 	replybuffer[replyidx] = 0; // null term
 	return replyidx;
 }
-/**********************************************************************************************************************************/
+
+/**
+ * @brief Read a single line or up to 254 bytes
+ *
+ * @param timeout Reply timeout
+ * @param multiline true: read the maximum amount. false: read up to the second
+ * newline
+ * @return uint8_t the number of bytes read
+ */
+uint8_t ASIM::readAnswerLn(uint16_t timeout, bool multiline) {
+	uint16_t replyidx = 0;
+	while (timeout--) {
+		while (simSerial->available()) {
+			char c = simSerial->read();
+			replybuffer[replyidx] = c;
+			replyidx++;
+			if (replyidx > 253) {
+				timeout = 0;
+				break;
+			}
+		}
+		if (timeout == 0) break;
+		delay(1);
+	}
+	replybuffer[replyidx] = 0; // null term
+	return replyidx;
+}
+
 /**
  * @brief Send data and verify the response matches an expected response
  *
@@ -602,10 +622,10 @@ bool ASIM::parseReply(ASIMFlashString toreply, char *v, char divider, uint8_t in
  * @param index The index of the parsed field to retrieve
  * @return true: success, false: failure
 */
-bool ASIM::parseReplyQuoted(ASIMFlashString toreply, char *v, int maxlen, char divider, uint8_t index) {
+bool ASIM::parseReplyQuoted(char *buffer, ASIMFlashString toreply, char *v, int maxlen, char divider, uint8_t index) {
 	uint8_t i = 0, j;
 	// Verify response starts with toreply.
-	char *p = prog_char_strstr(replybuffer, (prog_char *)toreply);
+	char *p = prog_char_strstr(buffer, (prog_char *)toreply);
 	if (p == 0)
 		return false;
 	p += prog_char_strlen((prog_char *)toreply);
@@ -658,7 +678,6 @@ bool ASIM::sendParseReply(ASIMFlashString tosend, ASIMFlashString toreply, uint1
   return true;
 }
 
-/**********************************************************************************************************************************/
 /**
  * @brief Get type of GSM modem
  *
@@ -726,13 +745,15 @@ uint8_t ASIM::getIMEI() {
  *
  * @return uint8_t The type of sim card
 */
-uint8_t ASIM::getSimType() {
+int8_t ASIM::getSimType() {
 	DEBUG_PRINTLN(F("================= CHECK SIM TYPE ================="));
 	DEBUG_PRINT(F("\t---> "));
   	DEBUG_PRINTLN("AT+COPS?");
 
 	simSerial->println("AT+COPS?");
-	readAnswer(500, true);
+	if(readAnswer(500, true) <= 1) {
+		return -1;
+	} 
 	
 	DEBUG_PRINT("\t");
 	DEBUG_PRINT(replybuffer);
@@ -751,40 +772,6 @@ uint8_t ASIM::getSimType() {
 		return UNKNOWN_SIM;
 	}
 }
-/**********************************************************************************************************************************/
-/**
- * @brief Check modem status and health
- *
- * @return bool true if modem work correctly, false otherwise
-*/
-bool ASIM::checkModemStatus() {
-	bool check_flag = false;
-	uint8_t signal = WEAK_SIGNAL;
-	uint8_t sim_status = 0b11111111;
-
-	check_flag = checkregistration();
-	sim_status = sim_status & check_flag;
-
-	check_flag = checkPIN();
-	sim_status = sim_status & check_flag;
-
-	signal = getSignalQuality();
-	check_flag = false;
-	if(signal != WEAK_SIGNAL) {
-		check_flag = true;
-	}
-	sim_status = sim_status & check_flag;
-
-
-
-	DEBUG_PRINTLN(sim_status, BIN);
-	DEBUG_PRINTLN(F("================= CHECK GSM STATUS ================="));
-	if(sim_status)
-		DEBUG_PRINTLN("MODEM WORKS CORRECTLY");
-	else
-		DEBUG_PRINTLN("MODEM DOES NOT WORK CORRECTLY");
-	return sim_status;
-}
 
 /**
  * @brief Check simcard registration status 
@@ -792,7 +779,6 @@ bool ASIM::checkModemStatus() {
  * @return bool true if simcard registerd, false otherwise
 */
 bool ASIM::checkregistration() {
-	char *endpoint;
 	bool cmpr_result = false;
 
 	DEBUG_PRINTLN(F("================= CHECK REG ================="));
@@ -813,7 +799,6 @@ bool ASIM::checkregistration() {
  * @return bool true if simcard has no PIN, false otherwise
 */
 bool ASIM::checkPIN() {
-	char *endpoint;
 	int8_t cmpr_result = 1;
 	DEBUG_PRINTLN(F("================= CHECK REG ================="));
 
@@ -834,10 +819,12 @@ bool ASIM::checkPIN() {
  *
  * @return uint8_t signal status (WEAK, MARGINAL, GOOD or EXCELLENT)
 */
-uint8_t ASIM::getSignalQuality() {
+int8_t ASIM::getSignalQuality() {
 	uint16_t sgq;
 	DEBUG_PRINTLN(F("================= CHECK SIGNAL QUALITY ================="));
-	sendParseReply(F("AT+CSQ"), F("+CSQ: "), &sgq);
+	if(!sendParseReply(F("AT+CSQ"), F("+CSQ: "), &sgq)) {
+		return -1;
+	}
 	if(sgq > 20) {
 		DEBUG_PRINT("SIGNAL STRENGTH : ");
 		DEBUG_PRINTLN(sgq);
@@ -858,7 +845,33 @@ uint8_t ASIM::getSignalQuality() {
 	DEBUG_PRINTLN(sgq);
 	return WEAK_SIGNAL;
 }
-/**********************************************************************************************************************************/
+
+/**
+ * @brief Check communication between MCU and GSM
+ * 
+ * @return bool true if success, false otherwise
+ */
+bool ASIM::checkConnection(ASIMFlashString reply) {
+	bool retVal = false;
+	DEBUG_PRINTLN(F("================= CHECK CONNECTION ================="));
+	if(sendVerifyedCommand(F("AT"), reply, 500)) {
+		retVal = true;
+	}else {
+		retVal = false;
+	}
+	return retVal;	
+}
+
+/**
+ * @brief Echo off
+ * 
+ * @return bool true if set successfully, false otherwise
+ */
+bool ASIM::echoOff() {
+	DEBUG_PRINTLN(F("================= TURN OF ECHO ================="));
+	return sendVerifyedCommand(F("ATE0"), F("ATE0OK"), 500);	
+}
+
 /**
  * @brief Set baudrate to modem
  *
@@ -874,6 +887,17 @@ bool ASIM::setBaud(unsigned long baud) {
 
 	is_set = sendVerifyedCommand(_cmd, ok_reply, 500);
 	return is_set;
+}
+
+/**
+ * @brief Set modem fuctionality
+ *
+ * @param mode fuctionality mode(0:minimum, 1:full, 4:disable)
+ * @return bool true if set successfully, false otherwise
+*/
+bool ASIM::setFunctionality(uint8_t mode) {
+	DEBUG_PRINTLN(F("================= SET FUNCTIONALITY ================="));
+	return sendVerifyedCommand(F("AT+CFUN="), mode, ok_reply, 500);
 }
 
 /**
@@ -903,7 +927,7 @@ bool ASIM::setCharSet(char *chs) {
  *
  * @return bool true if set successfully, false otherwise
 */
-bool ASIM::setCLI() {
+bool ASIM::setCallerIdNotification() {
 	DEBUG_PRINTLN(F("================= SET CLIP ================="));
 	return sendVerifyedCommand(F("AT+CLIP=1"), ok_reply, 500);
 }
@@ -957,6 +981,70 @@ bool ASIM::setSIMLanguage(uint8_t lang) {
 			return(sendUSSD("*555*4*3*1#", result, &result_len, 512));
 		}	
 	}
+}
+
+/**
+ * @brief Reset the modem by software
+ *
+ * @return bool true if set successfully, false otherwise
+*/
+bool ASIM::softReset() {
+	DEBUG_PRINTLN(F("================= SOFT RESET MODEM ================="));
+	return sendVerifyedCommand(F("AT+CFUN=1,1"), ok_reply);
+
+}
+
+/**
+ * @brief Reset the modem by hardware
+ *
+ * @return bool true if set successfully, false otherwise
+*/
+bool ASIM::hardReset() {
+	DEBUG_PRINTLN(F("================= HARD RESET MODEM ================="));
+	if((_modem_type == SIM808_V1) || (_modem_type == SIM808_V2)) {
+		if(_rst_pin > 0) {
+			digitalWrite(_rst_pin, LOW);
+			delay(1000);
+			digitalWrite(_rst_pin, HIGH);
+		}
+		else if(_in_pwr_pin > 0) {
+			digitalWrite(_in_pwr_pin, LOW);
+			delay(1000);
+			digitalWrite(_in_pwr_pin, HIGH);
+			if(_pwr_key_pin > 0) {
+				delay(300);
+				digitalWrite(_pwr_key_pin, HIGH);
+				delay(1000);
+				digitalWrite(_pwr_key_pin, LOW);
+			}
+		}
+		else {
+			DEBUG_PRINTLN(F("HARDWARE RESET DOES NOT SUPPORT ON YOUR DEVICE"));
+			return SIM_FAILED;
+		}
+	}
+	else if(_modem_type == SIM800 ){
+		if(_in_pwr_pin > 0) {
+			digitalWrite(_in_pwr_pin, LOW);
+			delay(1000);
+			digitalWrite(_in_pwr_pin, HIGH);
+			if(_pwr_key_pin > 0) {
+				delay(300);
+				digitalWrite(_pwr_key_pin, HIGH);
+				delay(1000);
+				digitalWrite(_pwr_key_pin, LOW);
+			}
+		}
+		else {
+			DEBUG_PRINTLN(F("HARDWARE RESET DOES NOT SUPPORT ON YOUR DEVICE"));
+			return SIM_FAILED;
+		}
+	}
+	else {
+		DEBUG_PRINTLN(F("HARDWARE RESET DOES NOT SUPPORT ON YOUR DEVICE"));
+		return SIM_FAILED;
+	}
+	return SIM_OK;
 }
 /**********************************************************************************************************************************/
 /**
@@ -1076,6 +1164,7 @@ bool ASIM::incomeCallNumber(char *phone_number) {
 	_incoming_call = false;
 	return SIM_OK;
 }
+
 /**********************************************************************************************************************************/
 /**
  * @brief Delete all sms in inbox
@@ -1149,6 +1238,7 @@ bool ASIM::sendSMS(char *receiver_number, char *msg) {
 
 	// read the +CMGS reply, wait up to 10 seconds!
 	readAnswer(10000);
+	DEBUG_PRINTLN(replybuffer);
 
 	if ((!strstr(replybuffer, "+CMGS")) || (!strstr(replybuffer, "OK"))) {
 		DEBUG_PRINTLN("SMS DID NOT SEND PROPERLY");
@@ -1172,7 +1262,9 @@ bool ASIM::readSMS(uint8_t message_index, char *sender, char *body, uint16_t *sm
 	uint16_t sms_mode;
 	uint16_t thesmslen = 0;
 	char *endpoint, *substr;
-	char temp[256];
+	char temp[maxlen];
+	char datetime[25];
+	char div[256];
 	char sendcmd[30] = "AT+CMGS=\"";
 
 	DEBUG_PRINTLN(F("================= READING SMS ================="));
@@ -1195,43 +1287,25 @@ bool ASIM::readSMS(uint8_t message_index, char *sender, char *body, uint16_t *sm
 
 	simSerial->print(F("AT+CMGR="));
 	simSerial->println(message_index);
-	readAnswer(3000);
-
+	readAnswerLn(1000);
+	flushInput();
 	// parse it out...
-	DEBUG_PRINTLN(replybuffer);
-
-	if (!parseReply(F("+CMGR:"), &thesmslen, ',', 11)) {
-		DEBUG_PRINTLN("THERE IS NO SMS WITH INPUT INDEX");
+	uint16_t full_reply_len = min(maxlen, (uint16_t)strlen(replybuffer));
+	endpoint = strstr(replybuffer, "OK");
+	if(!endpoint) {
+		DEBUG_PRINTLN("THERE IS NO SMS WITH REQUESTED INDEX");
 		*sms_len = 0;
 		return SIM_FAILED;
 	}
-
-	flushInput();
-
-	uint16_t full_reply_len = min(maxlen, (uint16_t)strlen(replybuffer));
-
-	bool result = parseReplyQuoted(F("+CMGR:"), sender, full_reply_len, ',', 1);
-	result = parseReplyQuoted(F("+CMGR:"), temp, full_reply_len, ',', 11);
-	endpoint = strstr(temp, "OK");
-	if(!endpoint) {
-		return SIM_FAILED;
+	DEBUG_PRINTLN(replybuffer);
+	bool result = parseReplyQuoted(replybuffer, F("+CMGR:"), sender, full_reply_len, ',', 1);
+	result = parseReplyQuoted(replybuffer, F("+CMGR:"), body, full_reply_len, 0x0A, 1);
+	endpoint = strstr(body, "\r");
+	if(endpoint) {
+		*endpoint = NULL;
 	}
-	*endpoint = NULL;
 
-	if((thesmslen >= 1) && (thesmslen < 10))
-		substr = temp + 1;
-	else if((thesmslen >= 10) && (thesmslen < 100))
-		substr = temp + 2;
-	else if((thesmslen >= 100) && (thesmslen < 1000))
-		substr = temp + 3;
-	else if((thesmslen >= 1000) && (thesmslen < 10000))
-		substr = temp + 4;
-	else
-		substr = temp + 0;
-	
-	strncpy(body, substr, strlen(substr));
-
-	*sms_len = thesmslen;
+	*sms_len = strlen(body);
 
 	return SIM_OK;
 }
@@ -1247,7 +1321,7 @@ bool ASIM::readSMS(uint8_t message_index, char *sender, char *body, uint16_t *sm
  * @param maxlen The maximum read length
  * @return bool true if success, false otherwise
 */
-bool ASIM::readSMS(uint8_t message_index, char *sender, char *body, char *date, char *tyme, uint16_t *sms_len, uint16_t maxlen) {
+bool ASIM::readSMS(uint8_t message_index, char *sender, char *body, char *date, char *tyme, char *type, uint16_t *sms_len, uint16_t maxlen) {
 	uint16_t sms_mode;
 	uint16_t thesmslen = 0;
 	char *endpoint, *substr;
@@ -1275,45 +1349,29 @@ bool ASIM::readSMS(uint8_t message_index, char *sender, char *body, char *date, 
 
 	simSerial->print(F("AT+CMGR="));
 	simSerial->println(message_index);
-	readAnswer(3000);
-
+	readAnswerLn(1000);
+	flushInput();
 	// parse it out...
 	DEBUG_PRINTLN(replybuffer);
-
-	if (!parseReply(F("+CMGR:"), &thesmslen, ',', 11)) {
-		DEBUG_PRINTLN("THERE IS NO SMS WITH INPUT INDEX");
+	uint16_t full_reply_len = min(maxlen, (uint16_t)strlen(replybuffer));
+	endpoint = strstr(replybuffer, "OK");
+	if(!endpoint) {
+		DEBUG_PRINTLN("THERE IS NO SMS WITH REQUESTED INDEX");
 		*sms_len = 0;
 		return SIM_FAILED;
 	}
 
-	flushInput();
-
-	uint16_t full_reply_len = min(maxlen, (uint16_t)strlen(replybuffer));
-
-	parse_result = parseReplyQuoted(F("+CMGR:"), sender, full_reply_len, ',', 1);
-	parse_result = parseReplyQuoted(F("+CMGR:"), temp, full_reply_len, ',', 11);
-	parse_result = parseReplyQuoted(F("+CMGR:"), date, full_reply_len, ',', 3);
-	parse_result = parseReplyQuoted(F("+CMGR:"), tyme, full_reply_len, ',', 4);
-	endpoint = strstr(temp, "OK");
-	if(!endpoint) {
-		return SIM_FAILED;
+	parse_result = parseReplyQuoted(replybuffer, F("+CMGR:"), type, full_reply_len, '\"', 1);
+	parse_result = parseReplyQuoted(replybuffer, F("+CMGR:"), sender, full_reply_len, ',', 1);
+	parse_result = parseReplyQuoted(replybuffer, F("+CMGR:"), date, full_reply_len, ',', 3);
+	parse_result = parseReplyQuoted(replybuffer, F("+CMGR:"), tyme, full_reply_len, ',', 4);
+	parse_result = parseReplyQuoted(replybuffer, F("+CMGR:"), body, full_reply_len, 0x0A, 1);
+	endpoint = strstr(body, "\r");
+	if(endpoint) {
+		*endpoint = NULL;
 	}
-	*endpoint = NULL;
 
-	if((thesmslen >= 1) && (thesmslen < 10))
-		substr = temp + 1;
-	else if((thesmslen >= 10) && (thesmslen < 100))
-		substr = temp + 2;
-	else if((thesmslen >= 100) && (thesmslen < 1000))
-		substr = temp + 3;
-	else if((thesmslen >= 1000) && (thesmslen < 10000))
-		substr = temp + 4;
-	else
-		substr = temp + 0;
-	
-	strncpy(body, substr, strlen(substr));
-
-	*sms_len = thesmslen;
+	*sms_len = strlen(body);
 
 	return SIM_OK;
 }
@@ -1438,7 +1496,7 @@ bool ASIM::enableGPRS() {
 		case MCI:
 			strcpy(network_apn, "mcinet");
 			break;
-		case RTEL:
+		case RITEL:
 			strcpy(network_apn, "RighTel");
 			break;		
 		default:
@@ -1476,7 +1534,7 @@ bool ASIM::enableGPRS() {
 	}
 
 	sendVerifyedCommand(F("AT+SAPBR=2,1"), ok_reply, 2000);
-	parseReplyQuoted(F("+SAPBR: "), _modem_ip, 15, ',', 2);
+	parseReplyQuoted(replybuffer, F("+SAPBR: "), _modem_ip, 15, ',', 2);
 	endpoint = strstr(_modem_ip, "OK");
 	if(endpoint) {
 		*endpoint = NULL;
@@ -1529,6 +1587,48 @@ bool ASIM::disableGPRS() {
 	
 	return SIM_OK;
 }
+
+/**
+ * @brief Get GSM location from GPRS
+ *
+ * @param lat Pointer to a buffer to hold the latitude
+ * @param lon Pointer to a buffer to hold the longitude
+ * @return bool true if success, false otherwise
+*/
+bool ASIM::getGPRSLocation(uint16_t *error, float *lat, float *lon) {
+	uint16_t returncode;
+	char error_code[120];
+  	char gps_buffer[120];
+	DEBUG_PRINTLN(F("================= GET GPRS LOCATION ================="));
+	getReply(F("AT+CIPGSMLOC=1,1"), (uint16_t)10000);
+	if (!parseReply(F("+CIPGSMLOC: "), error)) {
+		DEBUG_PRINTLN("CAN NOT GET LOCATION DUE TO ERROR");
+		return SIM_FAILED;
+	}
+	char *p = replybuffer + 14;
+  	uint16_t lentocopy = (int)strlen(p);
+  	strncpy(gps_buffer, p, lentocopy + 1);
+  	readAnswer(); // eat OK
+
+	// +CIPGSMLOC: 0,-74.007729,40.730160,2015/10/15,19:24:55
+	// tokenize the gps buffer to locate the lat & long
+	char *longp = strtok(gps_buffer, ",");
+	if (!longp) {
+		DEBUG_PRINTLN("CAN NOT CALCULATE LONGITUDE");
+		return SIM_FAILED;
+	}
+
+	char *latp = strtok(NULL, ",");
+	if (!latp) {
+		DEBUG_PRINTLN("CAN NOT CALCULATE LATITUDE");
+		return SIM_FAILED;
+	}
+
+	*lat = atof(latp);
+	*lon = atof(longp);
+
+    return SIM_OK;
+}
 /**********************************************************************************************************************************/
 /**
  * @brief Initialize HTTP
@@ -1558,7 +1658,7 @@ bool ASIM::termHttp() {
  * @return bool true if success, false otherwise
 */
 bool ASIM::setHttpParameter(ASIMFlashString parameter, const char *value) {
-	char param_cmd[1024];
+	char param_cmd[50];
 	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
 	flushInput();
 
@@ -1586,7 +1686,7 @@ bool ASIM::setHttpParameter(ASIMFlashString parameter, const char *value) {
  * @return bool true if success, false otherwise
 */
 bool ASIM::setHttpParameter(ASIMFlashString parameter, ASIMFlashString value) {
-	char param_cmd[1024];
+	char param_cmd[50];
 	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
 	flushInput();
 
@@ -1655,19 +1755,17 @@ bool ASIM::setHttpDataParameter(uint32_t size, uint32_t max_wait) {
 */
 bool ASIM::setHttpAction(uint8_t method, uint16_t *status, uint16_t *data_len, int32_t timeout) {
 	DEBUG_PRINTLN(F("================= MAKE HTTP ACTION ================="));
-	if (!sendVerifyedCommand(F("AT+HTTPACTION="), method, ok_reply, 2000)) {
+	if (!sendVerifyedCommand(F("AT+HTTPACTION="), method, ok_reply)) {
 		return SIM_FAILED;
 	}
 
 	readAnswer(timeout);
 
 	if (!parseReply(F("+HTTPACTION:"), status, ',', 1)) {
-		DEBUG_PRINTLN(F("UNKNOWN STATUS CODE"));
-		return SIM_FAILED;
+		SIM_FAILED;
 	}
   	if (!parseReply(F("+HTTPACTION:"), data_len, ',', 2)) {
-		DEBUG_PRINTLN(F("UNKNOWN RESPONSE LENGTH"));
-		return SIM_FAILED;
+		SIM_FAILED;
 	}
 
 	return SIM_OK;
@@ -1679,114 +1777,11 @@ bool ASIM::setHttpAction(uint8_t method, uint16_t *status, uint16_t *data_len, i
  * @param data_len Pointer to the  a `uint16_t` to hold the length of the data read
  * @return bool true if success, false otherwise
 */
-bool ASIM::readHttpResponse(char *response, uint16_t response_len) {
-	char *substr;
-	uint8_t len_index = 0;
+bool ASIM::readHttpResponse(uint16_t *data_len) {
 	DEBUG_PRINTLN(F("================= READ HTTP RESPONSE ================="));
 	getReply(F("AT+HTTPREAD"));
-	if(response_len <10)
-		len_index = 1;
-	else if((response_len >= 10) && (response_len < 100))
-		len_index = 2;
-	else if((response_len >= 100) && (response_len < 1000))
-		len_index = 3;
-	else if(response_len >= 1000) 
-		len_index = 4;
-	else 
-		len_index = 0;
-	
-	substr = replybuffer + 11 + len_index;
-	strncpy(response, substr, strlen(substr));
-	if(strlen(response) <= 0) {
-		DEBUG_PRINTLN("CAN NOT PARSE RESPONSE");
-		return SIM_FAILED;
-	}
-	
-	return SIM_OK;
-}
-
-/**
- * @brief Start an HTTP POST request
- *
- * @param url Pointer to a buffer with the URL to POST
- * @param cont_type The message content type
- * @param data Pointer to a buffer with the POST data to be sent
- * @param data_len The length of the POST data
- * @param timeout The timeout of sending the data to the server
- * @param status Pointer to a uint16_t to hold the request status as an RFC2616
- * @param response_len Pointer to the  a `uint16_t` to hold the length of the response
- * @param response Pointer to the  a buffer to hold server response
- * @return bool true if success, false otherwise
-*/
-bool ASIM::postHttpRequest(char *url, char *cont_type, char *data, uint16_t data_len, uint16_t timeout, uint16_t *status, uint16_t *response_len, char *response) {
-	bool con_status = false;
-
-	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
-
-	_gprs_on = true;
-	if(!_gprs_on) {
-		con_status = enableGPRS();
-		if(!con_status) {
-			DEBUG_PRINTLN("CAN NOT ENABLE GPRS");
-			_gprs_on = false;
-			_tcp_running = false;
-			return SIM_FAILED;
-		}
-	}
-
-	// Handle any pending
-	termHttp();
-
-	// Initialize and set parameters
-	if (!initHttp()) {
-		DEBUG_PRINTLN("CAN NOT INIT HTTP"); 
-		return SIM_FAILED;
-	}
-	
-	if (!setHttpParameter(F("CID"), 1)) {
-		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
-		return SIM_FAILED;
-	}
-
-	if (!setHttpParameter(F("URL"), F(url))) {
-		DEBUG_PRINTLN("CAN NOT SET URL");
-		return SIM_FAILED;
-	}
-
-	if (!setHttpParameter(F("CONTENT"), F(cont_type))) {
-		DEBUG_PRINTLN("CAN NOT SET URL");
-		return SIM_FAILED;
-	}
-
-	if (!setHttpDataParameter(data_len, timeout)) {
-		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
-		return SIM_FAILED;
-	}
-
-	if(sendVerifyedCommand(data, ok_reply)) {
-		DEBUG_PRINTLN("CAN NOT SEND DATA TO SERVER");
-		return SIM_FAILED;
-	}
-	
-	if(!setHttpAction(1, status, response_len, 10000)) {
-		DEBUG_PRINTLN("CAN NOT SEND POST REQUEST");
-		return SIM_FAILED;
-	}
-
-	if(!readHttpResponse(response, *response_len)) {
-		DEBUG_PRINTLN("SERVER DID NOT SEND RESPOND");
-	}
-
-	DEBUG_PRINT(F("Status: "));
-	DEBUG_PRINTLN(*status);
-	DEBUG_PRINT(F("Len: "));
-	DEBUG_PRINTLN(*response_len);
-	DEBUG_PRINT(F("Response: "));
-	DEBUG_PRINTLN(response);
-
-	if(!termHttp()) {
-		DEBUG_PRINTLN("CANNOT TERMINATE HTTP");
-		return SIM_FAILED;
+	if (!parseReply(F("+HTTPREAD:"), data_len, ',', 0)) {
+		SIM_FAILED;
 	}
 
 	return SIM_OK;
@@ -1797,103 +1792,35 @@ bool ASIM::postHttpRequest(char *url, char *cont_type, char *data, uint16_t data
  *
  * @param url Pointer to a buffer with the URL to POST
  * @param cont_type The message content type
- * @param token The user costume data such as token
  * @param data Pointer to a buffer with the POST data to be sent
  * @param data_len The length of the POST data
- * @param timeout The timeout of sending the data to the server
  * @param status Pointer to a uint16_t to hold the request status as an RFC2616
  * @param response_len Pointer to the  a `uint16_t` to hold the length of the response
- * @param response Pointer to the  a buffer to hold server response
  * @return bool true if success, false otherwise
 */
-bool ASIM::postHttpRequest(char *url, char *cont_type, char *token, char *data, uint16_t data_len, uint16_t timeout, uint16_t *status, uint16_t *response_len, char *response) {
-	bool con_status = false;
-
+bool ASIM::postHttpRequest(char *url, ASIMFlashString cont_type, const uint8_t *data, uint16_t data_len, uint16_t *status, uint16_t *response_len) {
 	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
-
-	_gprs_on = true;
-	if(!_gprs_on) {
-		con_status = enableGPRS();
-		if(!con_status) {
-			DEBUG_PRINTLN("CAN NOT ENABLE GPRS");
-			_gprs_on = false;
-			_tcp_running = false;
-			return SIM_FAILED;
-		}
-	}
-
 	// Handle any pending
 	termHttp();
 
 	// Initialize and set parameters
-	if (!initHttp()) {
-		DEBUG_PRINTLN("CAN NOT INIT HTTP"); 
-		return SIM_FAILED;
-	}
-	
-	if (!setHttpParameter(F("CID"), 1)) {
-		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
-		return SIM_FAILED;
-	}
+	if (!initHttp())
+		return false;
+	if (!setHttpParameter(F("CID"), 1))
+		return false;
+	// if (!setHttpParameter(F("UA"), useragent))
+	// 	return false;
+	if (!setHttpParameter(F("URL"), url))
+		return false;
 
-	if (!setHttpParameter(F("USERDATA"), F(token))) {
-		DEBUG_PRINTLN("CAN NOT SET USER DATA");
-		return SIM_FAILED;
-	}
+	// HTTPS redirect
+	// if (httpsredirect) {
+	// 	if (!HTTP_para(F("REDIR"), 1))
+	// 	return false;
 
-	if (!setHttpParameter(F("URL"), F(url))) {
-		DEBUG_PRINTLN("CAN NOT SET URL");
-		return SIM_FAILED;
-	}
-
-	if (!setHttpParameter(F("CONTENT"), F(cont_type))) {
-		DEBUG_PRINTLN("CAN NOT SET URL");
-		return SIM_FAILED;
-	}
-
-	if (!setHttpDataParameter(data_len, timeout)) {
-		DEBUG_PRINTLN("CAN NOT SET BEARER PROFILE IDENTIFRE");
-		return SIM_FAILED;
-	}
-
-	if(sendVerifyedCommand(data, ok_reply)) {
-		DEBUG_PRINTLN("CAN NOT SEND DATA TO SERVER");
-		return SIM_FAILED;
-	}
-	
-	if(!setHttpAction(1, status, response_len, 10000)) {
-		DEBUG_PRINTLN("CAN NOT SEND POST REQUEST");
-		return SIM_FAILED;
-	}
-
-	if(!readHttpResponse(response, *response_len)) {
-		DEBUG_PRINTLN("SERVER DID NOT SEND RESPOND");
-	}
-
-	DEBUG_PRINT(F("Status: "));
-	DEBUG_PRINTLN(*status);
-	DEBUG_PRINT(F("Len: "));
-	DEBUG_PRINTLN(*response_len);
-	DEBUG_PRINT(F("Response: "));
-	DEBUG_PRINTLN(response);
-
-	if(!termHttp()) {
-		DEBUG_PRINTLN("CANNOT TERMINATE HTTP");
-		return SIM_FAILED;
-	}
-
-	return SIM_OK;
-}
-
-/**
- * @brief Enable or disable SSL
- *
- * @param state true for enable and false for disable
- * @return bool true if success, false otherwise
-*/
-bool ASIM::setSSL(bool state) {
-	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
-  	return sendVerifyedCommand(F("AT+HTTPSSL="), state ? 1 : 0, ok_reply);
+	// 	if (!HTTP_ssl(true))
+	// 	return false;
+	// }
 }
 /**********************************************************************************************************************************/
 /**
@@ -2148,7 +2075,7 @@ bool ASIM::setRTC(uint8_t year, uint8_t month, uint8_t day, uint8_t hr, uint8_t 
 */
 bool ASIM::readRTC(uint8_t *year, uint8_t *month, uint8_t *day, uint8_t *hr, uint8_t *min, uint8_t *sec) {
 	DEBUG_PRINTLN(F("================= GET RTC ================="));
-	getReply(F("AT+CCLK?"), (uint16_t) 1000); //Get RTC timeout 10 sec
+	getReply(F("AT+CCLK?"), (uint16_t) 100); //Get RTC timeout 100 msec
 	if (strncmp(replybuffer, "+CCLK: ", 7) != 0)
 		return false;
 
@@ -2237,13 +2164,4 @@ bool ASIM::setPWM(uint8_t channel, uint16_t period, uint8_t duty) {
 	sprintf(pwm_cmd, "AT+SPWM=%d,%d,%d", channel, period, duty);
 	return sendVerifyedCommand(pwm_cmd, ok_reply);
 }
-
-
-
-
-
-
-
-
-
 

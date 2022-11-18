@@ -1546,8 +1546,8 @@ bool ASIM::enableGPRS() {
 	}
 
 	// Turn on GPRS
-	sendVerifyedCommand(F("AT+SAPBR=1,1"), ok_reply, 7000);
-	if(!sendVerifyedCommand(F("AT+CIICR"), ok_reply, 7000)) {
+	sendVerifyedCommand(F("AT+SAPBR=1,1"), ok_reply, 20000);
+	if(!sendVerifyedCommand(F("AT+CIICR"), ok_reply, 20000)) {
 		DEBUG_PRINTLN("CAN NOT CONNECT TO APN");
 		_gprs_on = false;
 		_tcp_running = false;

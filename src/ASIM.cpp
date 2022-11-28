@@ -1585,27 +1585,23 @@ bool ASIM::disableGPRS() {
 	// close all connections
 	if (!sendVerifyedCommand(F("AT+CIPSHUT"), F("SHUT OK"), 4000)) {
 		DEBUG_PRINTLN("CAN NOT SHUTDOWN PREVIOUS CONNECTION!");
-		_gprs_on = false;
-		_tcp_running = false;
 		return SIM_FAILED;
 	}
 
 	// close GPRS context
 	if(!sendVerifyedCommand(F("AT+SAPBR=0,1"), ok_reply, 3000)) {
 		DEBUG_PRINTLN("CAN NOT CLOSE GPRS CONTEXT");
-		_gprs_on = false;
-		_tcp_running = false;
 		return SIM_FAILED;
 	}
 
 	// Remove modem from network
 	if(!sendVerifyedCommand(F("AT+CGATT=0"), ok_reply, 3000)) {
 		DEBUG_PRINTLN("CAN NOT REMOVE MODEM FROM NETWORK");
-		_gprs_on = false;
-		_tcp_running = false;
 		return SIM_FAILED;
 	}
 	
+	_gprs_on = false;
+	_tcp_running = false;
 	return SIM_OK;
 }
 

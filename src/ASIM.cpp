@@ -92,44 +92,45 @@ bool ASIM::begin(ASIMStreamType &port, int setup_wait) {
 	// Get modem type
 	_modem_type = getModemType();
 
-	// Get modem IMEI
-	// getIMEI();
-
 	// Get SIM card type
 	_sim_type = getSimType();
 
 	// Check modem status
 	// checkModemStatus();
+	
+	#ifdef FULL_CONFIG
+		// Get modem IMEI
+		getIMEI();
 
-	// Set baudrate
-	setBaud(9600);
+		// Set baudrate
+		setBaud(9600);
 
-	// Set message mode
-	#ifdef DEFUALT_MODE
-		setMessageFormat(DEFUALT_MODE);
+		// Set message mode
+		#ifdef DEFUALT_MODE
+			setMessageFormat(DEFUALT_MODE);
+		#endif
+
+		// Set char set
+		#ifdef	DEFUALT_CHARSET
+			setCharSet(DEFUALT_CHARSET);
+		#endif
+
+		// Set CLI
+		setCallerIdNotification();
+
+		// Set SMS parameters
+		# ifdef SET_SMS_PARAM
+			setSMSParameters(49, 167, 0, 0);
+		#endif
+
+		// Delete all sms
+		clearInbox();
+
+		// Set simcard language to English
+		# ifdef SET_LANG_TO_ENG
+			setSIMLanguage(ENGLISH);
+		#endif
 	#endif
-
-	// Set char set
-	#ifdef	DEFUALT_CHARSET
-		setCharSet(DEFUALT_CHARSET);
-	#endif
-
-	// Set CLI
-	setCallerIdNotification();
-
-	// Set SMS parameters
-	# ifdef SET_SMS_PARAM
-		setSMSParameters(49, 167, 0, 0);
-	#endif
-
-	// Delete all sms
-	clearInbox();
-
-	// Set simcard language to English
-	# ifdef SET_LANG_TO_ENG
-		setSIMLanguage(ENGLISH);
-	#endif
-
 	// Flush serial port
 	flushInput();
 
@@ -1817,18 +1818,21 @@ bool ASIM::readHttpResponse(uint16_t *data_len) {
 */
 bool ASIM::postHttpRequest(char *url, ASIMFlashString cont_type, const uint8_t *data, uint16_t data_len, uint16_t *status, uint16_t *response_len) {
 	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
+	if(!_gprs_on) {
+		DEBUG_PRINTLN(F("GPRS IS OFF, LET's TURN IT ON"));
+	}
 	// Handle any pending
-	termHttp();
+	// termHttp();
 
-	// Initialize and set parameters
-	if (!initHttp())
-		return false;
-	if (!setHttpParameter(F("CID"), 1))
-		return false;
-	// if (!setHttpParameter(F("UA"), useragent))
+	// // Initialize and set parameters
+	// if (!initHttp())
 	// 	return false;
-	if (!setHttpParameter(F("URL"), url))
-		return false;
+	// if (!setHttpParameter(F("CID"), 1))
+	// 	return false;
+	// // if (!setHttpParameter(F("UA"), useragent))
+	// // 	return false;
+	// if (!setHttpParameter(F("URL"), url))
+	// 	return false;
 
 	// HTTPS redirect
 	// if (httpsredirect) {
@@ -1838,6 +1842,7 @@ bool ASIM::postHttpRequest(char *url, ASIMFlashString cont_type, const uint8_t *
 	// 	if (!HTTP_ssl(true))
 	// 	return false;
 	// }
+	return SIM_OK;
 }
 /**********************************************************************************************************************************/
 /**

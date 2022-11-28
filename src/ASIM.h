@@ -90,6 +90,7 @@
 #define TCP_CLOSED			8
 #define PDP_DEACTIVATED		9
 // Configs, Feel free to change them according to your project
+// #define FUll_CONFIG
 #define DEFAULT_TIMOUT 		100
 #define DEFUALT_INIT_WAIT	6000
 #define DEFUALT_MODE		TEXT_MODE

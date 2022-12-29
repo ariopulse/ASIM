@@ -97,7 +97,7 @@ bool ASIM::begin(ASIMStreamType &port, int setup_wait) {
 
 	// Check modem status
 	// checkModemStatus();
-	
+
 	#ifdef FULL_CONFIG
 		// Get modem IMEI
 		getIMEI();
@@ -1808,40 +1808,133 @@ bool ASIM::readHttpResponse(uint16_t *data_len) {
 /**
  * @brief Start an HTTP POST request
  *
- * @param url Pointer to a buffer with the URL to POST
- * @param cont_type The message content type
- * @param data Pointer to a buffer with the POST data to be sent
- * @param data_len The length of the POST data
- * @param status Pointer to a uint16_t to hold the request status as an RFC2616
- * @param response_len Pointer to the  a `uint16_t` to hold the length of the response
+ * @param url string of the target URL to POST
+ * @param auth_token string of the authorization token
+ * @param data string of data that wanted to POST
  * @return bool true if success, false otherwise
 */
-bool ASIM::postHttpRequest(char *url, ASIMFlashString cont_type, const uint8_t *data, uint16_t data_len, uint16_t *status, uint16_t *response_len) {
+bool ASIM::postHttpRequest(String url, String auth_token, String data, uint16_t server_timeout, char *server_response) {
+	int result = SIM_FAILED;
+	char *endpoint;
+	String temp_cmd = "";
+	char temp_buffer[256];
 	DEBUG_PRINTLN(F("================= HTTP POST REQUEST ================="));
+	// Check if GPRS is off and try to turn it on
 	if(!_gprs_on) {
-		DEBUG_PRINTLN(F("GPRS IS OFF, LET's TURN IT ON"));
+		sendVerifyedCommand(F("AT+SAPBR=2,1"), ok_reply, 2000);
+		parseReplyQuoted(replybuffer, F("+SAPBR: "), _modem_ip, 15, ',', 2);
+		endpoint = strstr(_modem_ip, "OK");
+		if(endpoint) {
+			*endpoint = NULL;
+		}
+		DEBUG_PRINT("MODEM IP IS ");
+		DEBUG_PRINTLN(_modem_ip);
+		if(strcmp(_modem_ip, "0.0.0.0") == 0) {
+			DEBUG_PRINTLN(F("GPRS IS OFF, LET's TURN IT ON"));
+			if(!enableGPRS()) {
+				DEBUG_PRINTLN(F("CAN NOT TURN ON GPRS !!!"));
+				return SIM_FAILED;
+			}
+		}
 	}
 	// Handle any pending
-	// termHttp();
+	termHttp();
+	delay(2);
 
-	// // Initialize and set parameters
-	// if (!initHttp())
-	// 	return false;
-	// if (!setHttpParameter(F("CID"), 1))
-	// 	return false;
-	// // if (!setHttpParameter(F("UA"), useragent))
-	// // 	return false;
-	// if (!setHttpParameter(F("URL"), url))
-	// 	return false;
+	// Init HTTP
+	if(!initHttp()) {
+		DEBUG_PRINTLN(F("CAN NOT INIT HTTP SECTION !!!"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
+	// Specify CID
+	if (!setHttpParameter(F("CID"), 1)) {
+		DEBUG_PRINTLN(F("CAN NOT SPECIFY CID = 1"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
 
-	// HTTPS redirect
-	// if (httpsredirect) {
-	// 	if (!HTTP_para(F("REDIR"), 1))
-	// 	return false;
+	// Specify USERDATA
+	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
+	temp_cmd = "AT+HTTPPARA=\"USERDATA\",\"Authorization:Token ";
+	temp_cmd += auth_token;
+	temp_cmd += "\"";
+	temp_cmd.toCharArray(temp_buffer, temp_cmd.length()+1);
+	getReply(temp_buffer, 2000);
+	if(strcmp(replybuffer, "OK") != 0) {
+		DEBUG_PRINTLN(F("CAN NOT SPECIFY TOKEN"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
+	memset(temp_buffer, 0, temp_cmd.length()+1);
+	temp_cmd = "";
 
-	// 	if (!HTTP_ssl(true))
-	// 	return false;
-	// }
+	// Specified URL
+	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
+	temp_cmd = "AT+HTTPPARA=\"URL\",\"";
+	temp_cmd += url;
+	temp_cmd += "\"";
+	temp_cmd.toCharArray(temp_buffer, temp_cmd.length()+1);
+	getReply(temp_buffer, 2000);
+	if(strcmp(replybuffer, "OK") != 0) {
+		DEBUG_PRINTLN(F("CAN NOT SPECIFY URL"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
+	memset(temp_buffer, 0, temp_cmd.length()+1);
+	temp_cmd = "";
+
+	// Specified CONTENT type
+	if (!setHttpParameter(F("CONTENT"), "application/json")) {
+		DEBUG_PRINTLN(F("CAN NOT SET CONTENT TYPE"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
+
+	// Set data len and max wait
+	if(!setHttpDataParameter(200, 2000)) {
+		DEBUG_PRINTLN(F("CAN NOT SET DATA PARAMETERS"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
+	delay(10);
+
+	// Send data
+	DEBUG_PRINTLN(F("================= SEND HTTP DATA ================="));
+	data.toCharArray(temp_buffer, data.length()+1);
+	if(!sendVerifyedCommand(temp_buffer, ok_reply, 2000)) {
+		DEBUG_PRINTLN(F("CAN NOT SEND DATA IN HTTP REQUEST"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
+
+	// Set POST action
+	DEBUG_PRINTLN(F("================= SEND HTTP ACTION ================="));
+	if(!sendVerifyedCommand(F("AT+HTTPACTION="), 1, ok_reply)) {
+		DEBUG_PRINTLN(F("CAN NOT SEND POST REQUEST"));
+		termHttp();
+		disableGPRS();
+		return SIM_FAILED;
+	}
+	delay(200);
+
+	// Read server response
+	getReply(F("AT+HTTPREAD"));
+	delay(200);
+	readAnswer(server_timeout, 1);
+	DEBUG_PRINT("server response = ");
+	DEBUG_PRINTLN(replybuffer);
+	// Extract main response
+	parseReplyQuoted(replybuffer, F("+HTTPACTION: 1"), server_response, sizeof replybuffer, ',', 1);
+
+
 	return SIM_OK;
 }
 /**********************************************************************************************************************************/

@@ -90,7 +90,7 @@
 #define TCP_CLOSED			8
 #define PDP_DEACTIVATED		9
 // Configs, Feel free to change them according to your project
-// #define FUll_CONFIG
+#define FULL_CONFIG
 #define DEFAULT_TIMOUT 		100
 #define DEFUALT_INIT_WAIT	6000
 #define DEFUALT_MODE		TEXT_MODE
@@ -170,7 +170,7 @@ class ASIM {
 		bool setHttpDataParameter(uint32_t size, uint32_t max_wait);
 		bool setHttpAction(uint8_t method, uint16_t *status, uint16_t *data_len, int32_t timeout);
 		bool readHttpResponse(uint16_t *data_len);
-		bool postHttpRequest(char *url, ASIMFlashString cont_type, const uint8_t *data, uint16_t data_len, uint16_t *status, uint16_t *response_len);
+		bool postHttpRequest(String url, String auth_token, String data, uint16_t server_timeout, char *server_response);
 		// TCP/IP connection
 		uint8_t getTCPStatus();
 		bool establishTCP();

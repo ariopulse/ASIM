@@ -95,6 +95,7 @@
 #define DEFUALT_INIT_WAIT	6000
 #define DEFUALT_MODE		TEXT_MODE
 #define DEFUALT_CHARSET		"GSM"
+#define HEX_CHARSET			"HEX"
 #define SET_SMS_PARAM
 // #define SET_LANG_TO_ENG
 
@@ -151,7 +152,7 @@ class ASIM {
 		// SMS
 		bool clearInbox();
 		bool deleteSMS(uint8_t message_index);
-		bool sendSMS(char *receiver_number, char *msg);
+		bool sendSMS(char *receiver_number, char *msg, bool hex);
 		bool readSMS(uint8_t message_index, char *sender, char *body, uint16_t *sms_len, uint16_t maxlen);
 		bool readSMS(uint8_t message_index, char *sender, char *body, char *date, char *tyme, char *type, uint16_t *sms_len, uint16_t maxlen);
 		int8_t getNumSMS();

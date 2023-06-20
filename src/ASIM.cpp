@@ -1230,11 +1230,19 @@ bool ASIM::deleteSMS(uint8_t message_index) {
  * @param msg The SMS body
  * @return bool true if send SMS successfully, false otherwise
 */
-bool ASIM::sendSMS(char *receiver_number, char *msg) {
+bool ASIM::sendSMS(char *receiver_number, char *msg, bool hex) {
 	uint16_t sms_mode;
 	char sendcmd[30] = "AT+CMGS=\"";
 
 	DEBUG_PRINTLN(F("================= SENDING SMS ================="));
+	if(hex) {
+		setCharSet(HEX_CHARSET);
+		setSMSParameters(49, 167, 0, 8);
+	}
+	else {
+		setCharSet(DEFUALT_CHARSET);
+		setSMSParameters(49, 167, 0, 0);
+	}
 
 	sendParseReply(F("AT+CMGF?"), F("+CMGF:"), &sms_mode);
 	if(sms_mode != TEXT_MODE) {
@@ -1858,7 +1866,8 @@ bool ASIM::postHttpRequest(String url, String auth_token, String data, uint16_t 
 
 	// Specify USERDATA
 	DEBUG_PRINTLN(F("================= SET HTTP PARAMETER ================="));
-	temp_cmd = "AT+HTTPPARA=\"USERDATA\",\"Authorization:Token ";
+	// temp_cmd = "AT+HTTPPARA=\"USERDATA\",\"Authorization:Token ";
+	temp_cmd = "AT+HTTPPARA=\"USERDATA\",\"Authorization:Bearer ";
 	temp_cmd += auth_token;
 	temp_cmd += "\"";
 	temp_cmd.toCharArray(temp_buffer, temp_cmd.length()+1);
@@ -1923,16 +1932,16 @@ bool ASIM::postHttpRequest(String url, String auth_token, String data, uint16_t 
 		disableGPRS();
 		return SIM_FAILED;
 	}
-	delay(200);
+	delay(12000);
 
 	// Read server response
-	getReply(F("AT+HTTPREAD"));
+	getReply(F("AT+HTTPREAD"), server_timeout);
 	delay(200);
-	readAnswer(server_timeout, 1);
+	// readAnswer(server_timeout, 1);
 	DEBUG_PRINT("server response = ");
 	DEBUG_PRINTLN(replybuffer);
 	// Extract main response
-	parseReplyQuoted(replybuffer, F("+HTTPACTION: 1"), server_response, sizeof replybuffer, ',', 1);
+	parseReplyQuoted(replybuffer, F("+HTTPREAD"), server_response, sizeof replybuffer, ': ', 1);
 
 
 	return SIM_OK;

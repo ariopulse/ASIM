@@ -1232,12 +1232,14 @@ bool ASIM::deleteSMS(uint8_t message_index) {
 */
 bool ASIM::sendSMS(char *receiver_number, char *msg, bool hex) {
 	uint16_t sms_mode;
+	uint16_t wait_to_send = 10000;
 	char sendcmd[30] = "AT+CMGS=\"";
 
 	DEBUG_PRINTLN(F("================= SENDING SMS ================="));
 	if(hex) {
 		setCharSet(HEX_CHARSET);
 		setSMSParameters(49, 167, 0, 8);
+		wait_to_send = 15000;
 	}
 	else {
 		setCharSet(DEFUALT_CHARSET);
@@ -1257,6 +1259,9 @@ bool ASIM::sendSMS(char *receiver_number, char *msg, bool hex) {
 
 	if (!sendVerifyedCommand(sendcmd, F("> "))) {
 		DEBUG_PRINTLN("SMS BODY INDICATOR ('>') DOES NOT SHOWN");
+		delay(1000);
+		setCharSet(DEFUALT_CHARSET);
+		setSMSParameters(49, 167, 0, 0);
 		return SIM_FAILED;
 	}
 
@@ -1267,13 +1272,19 @@ bool ASIM::sendSMS(char *receiver_number, char *msg, bool hex) {
 	DEBUG_PRINTLN(" ^Z");
 
 	// read the +CMGS reply, wait up to 10 seconds!
-	readAnswer(10000);
+	readAnswer(wait_to_send);
 	DEBUG_PRINTLN(replybuffer);
 
 	if ((!strstr(replybuffer, "+CMGS")) || (!strstr(replybuffer, "OK"))) {
 		DEBUG_PRINTLN("SMS DID NOT SEND PROPERLY");
+		delay(1000);
+		setCharSet(DEFUALT_CHARSET);
+		setSMSParameters(49, 167, 0, 0);
 		return SIM_FAILED;
 	}
+
+	setCharSet(DEFUALT_CHARSET);
+	setSMSParameters(49, 167, 0, 0);
 
 	return SIM_OK;
 }
@@ -1298,6 +1309,8 @@ bool ASIM::readSMS(uint8_t message_index, char *sender, char *body, uint16_t *sm
 	char sendcmd[30] = "AT+CMGS=\"";
 
 	DEBUG_PRINTLN(F("================= READING SMS ================="));
+	setCharSet(DEFUALT_CHARSET);
+	setSMSParameters(49, 167, 0, 0);
 
 	sendParseReply(F("AT+CMGF?"), F("+CMGF:"), &sms_mode);
 	if(sms_mode != TEXT_MODE) {
